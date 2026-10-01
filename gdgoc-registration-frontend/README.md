@@ -20,6 +20,7 @@ It is two small programs that run as one app:
 ## Contents
 
 - [Quick start](#quick-start)
+- [Everyday tasks](#everyday-tasks)
 - [The two jobs you'll be asked to do](#the-two-jobs-youll-be-asked-to-do)
 - [Why it is split in two](#why-it-is-split-in-two)
 - [How a request flows](#how-a-request-flows)
@@ -31,6 +32,7 @@ It is two small programs that run as one app:
 - [Troubleshooting](#troubleshooting)
 - [Going live](#going-live)
 - [Security notes](#security-notes)
+- [What stays out of git, and why](#what-stays-out-of-git-and-why)
 
 ---
 
@@ -47,6 +49,22 @@ npm install
 cd ../gdgoc-registration-frontend
 npm install
 ```
+
+**One-time data setup** — after every fresh clone:
+
+```bash
+cd gdgoc-registration-backend
+node scripts/seed-test-data.js
+```
+
+> **This step is easy to miss and fails quietly.** `data/students.json` is
+> git-ignored because it holds personal data, so your clone does not contain
+> one. Until you create it, the app runs and students can still register, but
+> **every roll-number lookup returns "not found"** — there is no roster to match
+> against, and the server logs nothing about it. The seed script needs no
+> dependencies beyond Node itself, so it works before `npm install`. To use the
+> real student list instead, just drop it into that same file — see
+> [Update the student roster](#1-update-the-student-roster).
 
 **Every time you want to work on it** — one command, one terminal:
 
@@ -98,6 +116,27 @@ lookup. A few useful ones:
 | `26I-9015` | A hyphen in the roll number (legal) |
 | `26i9019` | Parth Saxena — added by hand, for hands-on testing |
 | `26I9999` | Not in the roster — the manual-entry path |
+
+---
+
+### Everyday tasks
+
+| I want to… | Do this | Where |
+|---|---|---|
+| Set up from a fresh clone | `npm install` in both folders, then the seed script | [Quick start](#quick-start) |
+| Run the app | `npm run dev:all` | [Quick start](#quick-start) |
+| Get the test roster back | `node scripts/seed-test-data.js` | backend |
+| Clear submitted registrations only | `node scripts/seed-test-data.js --reset-only` | backend |
+| Load the real student list | edit `data/students.json` | [task 1](#1-update-the-student-roster) |
+| Use a roster without touching the repo | set `DATA_DIR` to your folder | [Configuration](#configuration) |
+| Put in the real form URLs | edit `config/verticals.js` | [task 2](#2-replace-the-placeholder-google-form-urls) |
+| Add a branch, year, gender or skill | edit `src/config/options.ts` | [dropdowns](#the-forms-dropdowns) |
+| Change the API port | `PORT` **and** the proxy in `vite.config.ts` | [Configuration](#configuration) |
+| Change colours or the theme | edit `src/index.css` | — |
+| Change any English/Hindi wording | edit `src/i18n/dictionaries.ts` | — |
+| Regenerate the light/dark logos | `node scripts/make-logo-variants.mjs` | frontend |
+| Check the phone field | `node scripts/verify-phone.mjs` | frontend |
+| Benchmark the JSON store | `node scripts/bench-store.js` | backend |
 
 ---
 
@@ -610,3 +649,116 @@ browser is hostile.
 If you change any of this, keep the invariant that makes it work: the frontend
 never contains a form URL or the roster, and the server re-validates everything
 it is sent.
+
+---
+
+## What stays out of git, and why
+
+Three things are deliberately not in this repository. Understanding *why* matters,
+because the reason is a property of git rather than of this project.
+
+### The one rule that explains all of it
+
+**Git history is permanent, and copying.** Once a file is in any commit, every
+clone has it forever. Deleting it in a later commit does **not** remove it —
+the old blob stays in history, and `git log -p` still prints the contents.
+
+So "I'll delete it before it leaks" is not a plan. The only safe time to keep
+something out of git is *before it ever goes in*.
+
+### 1. `data/students.json` — real names, emails, phone numbers
+
+Personal data for every student who signs up. Once committed it has been
+distributed to every clone, permanently, and it is far more likely to leak by
+accident than by attack: someone screenshots a lookup result, or someone commits
+the wrong folder from this directory.
+
+It is excluded here, and it is **not a loss of anything** — the roster is
+reproducible. `scripts/seed-test-data.js` has no npm dependencies at all (just
+`fs` and `path`), so this works in a fresh clone before you install anything:
+
+```bash
+cd gdgoc-registration-backend
+node scripts/seed-test-data.js     # writes 19 test students
+```
+
+For the real list, drop it into that same file. It re-reads from disk every
+30 seconds, so no restart is needed.
+
+### 2. `data/registrations.json` — the submission log
+
+Same reasoning: it is student personal data, and it is a log that grows on its
+own. The server creates it automatically on the first submission, so nothing is
+lost by not having it.
+
+### 3. `config/verticals.js` — the form URLs, *later*
+
+This one **is** tracked, and that is fine today: it currently holds only
+`placeholder-` values. The moment someone pastes the real links and commits
+them, those URLs are in history permanently.
+
+That quietly breaks the main thing the architecture buys you — that the eight
+links are only ever handed out **two at a time**, to the student who chose them.
+In git history, all eight become readable by anyone who can clone.
+
+This is an acceptable trade **only while the repository is private** and shared
+with people who already have the links. If it is ever made public, or given to
+someone outside the team, move the real URLs out first:
+
+```bash
+# 1. stop tracking it, keep the current copy on disk
+cd gdgoc-registration-backend
+git rm --cached config/verticals.js
+
+# 2. keep the placeholder file, add the ignore rule
+echo "config/verticals.local.js" >> .gitignore
+```
+
+Then in `config/verticals.js`, load the real values from a git-ignored sibling
+and fall back to the placeholders:
+
+```js
+const PLACEHOLDER_FORMS = Object.freeze({
+  content: "https://forms.google.com/placeholder-content",
+  /* ...the other seven, unchanged... */
+});
+
+// Real URLs live in verticals.local.js, which is git-ignored and never committed.
+let VERTICAL_FORMS = PLACEHOLDER_FORMS;
+try {
+  VERTICAL_FORMS = Object.freeze({ ...PLACEHOLDER_FORMS, ...require("./verticals.local") });
+} catch {
+  /* no local override - the placeholders stay in place */
+}
+```
+
+Seniors then paste their real links into `config/verticals.local.js`. **It must
+be a JavaScript module, not JSON** — `module.exports = { … }`, with the
+vertical keys unquoted. Raw JSON throws `Unexpected token ':'` and the override
+silently does nothing, because the `catch` swallows it:
+
+```js
+// config/verticals.local.js   -- correct
+module.exports = {
+  technical: "https://docs.google.com/forms/d/e/REALFORM123/viewform",
+  design: "https://docs.google.com/forms/d/e/REALFORM456/viewform",
+};
+```
+
+```json
+{ "technical": "https://docs.google.com/forms/d/e/REALFORM123/viewform" }   // WRONG
+```
+
+Because the failure is silent, verify it took effect — restart the API and
+submit the form, or check the URL directly:
+
+```bash
+cd gdgoc-registration-backend
+node -e "console.log(require('./config/verticals').VERTICAL_FORMS.technical)"
+```
+
+If that still prints a `placeholder-` URL, the override did not load.
+
+**Do this before making the repo public, not after** — history cannot be
+cleanly rewritten, and the only real remedy after the fact is deleting the
+repository and starting again.

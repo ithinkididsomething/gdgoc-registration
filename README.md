@@ -16,19 +16,59 @@ This repository holds both halves of the app:
 ## Start it
 
 ```bash
-# once
+# 1. install both halves (once)
 cd gdgoc-registration-backend  && npm install
 cd ../gdgoc-registration-frontend && npm install
 
-# every time
-cd gdgoc-registration-frontend
+# 2. create the student data file (once, after every fresh clone)
+cd ../gdgoc-registration-backend
+node scripts/seed-test-data.js
+
+# 3. run it (every time)
+cd ../gdgoc-registration-frontend
 npm run dev:all
 ```
 
 Then open **<http://localhost:5173>** — one command starts both halves.
 
+### Step 2 is not optional
+
+`data/students.json` is git-ignored because it holds personal data, so a fresh
+clone does **not** contain one. Until you create it, the app still runs and
+students can still register, but **every roll-number lookup returns "not
+found"** — there is no roster to match against. The server starts silently on an
+empty roster rather than warning you, which is the easiest thing in this project
+to get stuck on.
+
+Either run the seed script above for 19 test students, or drop in the real roster
+as described below.
+
 Test roll numbers: `26I9001` (normal), `26I9009` (single-section branch),
 `26I9014` (free-text branch), `26I9999` (not in the roster).
+
+---
+
+## Everyday tasks
+
+| I want to… | Do this |
+|---|---|
+| **Set up from a fresh clone** | `npm install` in both folders, then `node scripts/seed-test-data.js` |
+| **Run the app** | `cd gdgoc-registration-frontend` → `npm run dev:all` |
+| **Get the test roster back** | `cd gdgoc-registration-backend` → `node scripts/seed-test-data.js` |
+| **Clear submitted registrations only** | `node scripts/seed-test-data.js --reset-only` |
+| **Load the real student list** | Edit `gdgoc-registration-backend/data/students.json` (no restart — re-read every 30s) |
+| **Use a roster without editing the repo** | Set `DATA_DIR` to the folder holding your `students.json` |
+| **Put in the real Google Form URLs** | Edit `gdgoc-registration-backend/config/verticals.js` |
+| **Add a branch, year, gender or skill** | Edit `gdgoc-registration-frontend/src/config/options.ts` |
+| **Change the API port** | `PORT` for the backend **and** the proxy target in `frontend/vite.config.ts` |
+| **Change colours or theme** | `gdgoc-registration-frontend/src/index.css` |
+| **Change the Hindi/English wording** | `gdgoc-registration-frontend/src/i18n/dictionaries.ts` |
+| **Run the tests** | backend: `npm test` · frontend: `npm run check` |
+| **Regenerate the light/dark logos** | `node scripts/make-logo-variants.mjs` in the frontend |
+| **Check the phone field** | `node scripts/verify-phone.mjs` in the frontend |
+| **Benchmark the JSON store** | `node scripts/bench-store.js` in the backend |
+
+Full detail for each of these is in the [backend notes](gdgoc-registration-backend/README.md).
 
 ---
 
