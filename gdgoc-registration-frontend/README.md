@@ -22,6 +22,7 @@ It is two small programs that run as one app:
 - [Quick start](#quick-start)
 - [Everyday tasks](#everyday-tasks)
 - [The two jobs you'll be asked to do](#the-two-jobs-youll-be-asked-to-do)
+- [Getting the registrations out](#getting-the-registrations-out)
 - [Why it is split in two](#why-it-is-split-in-two)
 - [How a request flows](#how-a-request-flows)
 - [API reference](#api-reference)
@@ -30,6 +31,7 @@ It is two small programs that run as one app:
 - [Project layout](#project-layout)
 - [Testing and checks](#testing-and-checks)
 - [Troubleshooting](#troubleshooting)
+- [Deployment](#deployment)
 - [Going live](#going-live)
 - [Security notes](#security-notes)
 - [What stays out of git, and why](#what-stays-out-of-git-and-why)
@@ -121,22 +123,81 @@ lookup. A few useful ones:
 
 ### Everyday tasks
 
-| I want to… | Do this | Where |
-|---|---|---|
-| Set up from a fresh clone | `npm install` in both folders, then the seed script | [Quick start](#quick-start) |
-| Run the app | `npm run dev:all` | [Quick start](#quick-start) |
-| Get the test roster back | `node scripts/seed-test-data.js` | backend |
-| Clear submitted registrations only | `node scripts/seed-test-data.js --reset-only` | backend |
-| Load the real student list | edit `data/students.json` | [task 1](#1-update-the-student-roster) |
-| Use a roster without touching the repo | set `DATA_DIR` to your folder | [Configuration](#configuration) |
-| Put in the real form URLs | edit `config/verticals.js` | [task 2](#2-replace-the-placeholder-google-form-urls) |
-| Add a branch, year, gender or skill | edit `src/config/options.ts` | [dropdowns](#the-forms-dropdowns) |
-| Change the API port | `PORT` **and** the proxy in `vite.config.ts` | [Configuration](#configuration) |
-| Change colours or the theme | edit `src/index.css` | — |
-| Change any English/Hindi wording | edit `src/i18n/dictionaries.ts` | — |
-| Regenerate the light/dark logos | `node scripts/make-logo-variants.mjs` | frontend |
-| Check the phone field | `node scripts/verify-phone.mjs` | frontend |
-| Benchmark the JSON store | `node scripts/bench-store.js` | backend |
+Everything you might need to do, in one place. Details for each are linked.
+
+**Getting set up and running**
+
+| I want to… | Do this |
+|---|---|
+| Set up from a fresh clone | `npm install` in both folders, then the seed script — [Quick start](#quick-start) |
+| Run everything | `npm run dev:all` from `gdgoc-registration-frontend/` |
+| Run only the API | `cd gdgoc-registration-backend && npm run dev` |
+| Run only the web app | `cd gdgoc-registration-frontend && npm run dev` |
+| Check the API is alive | `curl http://localhost:3000/api/health` |
+
+**Student data**
+
+| I want to… | Do this |
+|---|---|
+| Get the 19-student test roster back | `node scripts/seed-test-data.js` (backend) |
+| Clear submitted registrations only | `node scripts/seed-test-data.js --reset-only` |
+| Load the real student list | Edit `data/students.json` — [details](#1-update-the-student-roster) |
+| Use a roster without touching the repo | Set `DATA_DIR` to the folder holding it |
+| Back up registrations | Copy `data/registrations.json` somewhere durable — [why it matters](#going-live) |
+| **Get registrations into a spreadsheet** | `node scripts/export-registrations.js` — [details](#getting-the-registrations-out) |
+| See which vertical is most popular | The same export prints a per-vertical tally |
+| Check for a duplicate roll number | The export warns you, or `npm run check` — [known gap](#going-live) |
+
+**Google Form links**
+
+| I want to… | Do this |
+|---|---|
+| Put in the real form URLs | Edit `config/verticals.js` — [details](#2-replace-the-placeholder-google-form-urls) |
+| Rename a vertical's label or blurb | `src/config/verticals.ts` (frontend) |
+| Reorder the verticals | `src/config/verticals.ts` |
+| Add or remove a vertical | Both files — [details](#changing-the-verticals) |
+| Get the URL out of Google Forms | **Send → Link**, use the `/viewform` variant |
+
+**The form itself**
+
+| I want to… | Do this |
+|---|---|
+| Add a branch, or change which have A/B | `src/config/options.ts` — [details](#branches-and-sections) |
+| Add a year or a gender option | `src/config/options.ts` **and** `src/validation.js` |
+| Add a skill suggestion | `src/config/options.ts` |
+| Change any wording (EN or HI) | `src/i18n/dictionaries.ts` |
+| Change a colour or the neumorphic depth | `src/index.css` |
+| Change the footer | `src/components/Footer.tsx` |
+| Change the logo | Replace the PNGs, or run `node scripts/make-logo-variants.mjs` |
+| Make a field optional or required | `src/steps/Step1Details.tsx` **and** `src/validation.js` |
+
+**Server behaviour**
+
+| I want to… | Do this |
+|---|---|
+| Change the API port | `PORT` **and** the target in `vite.config.ts` — [both](#configuration) |
+| Change the rate limits | `RATE_LIMIT_MAX_LOOKUP` / `RATE_LIMIT_MAX_REGISTER` — [table](#backend-environment-variables) |
+| Change the max upload/storage size | `BODY_LIMIT` / `MAX_STORE_BYTES` |
+| Change how often the roster re-reads | `STUDENTS_CACHE_TTL_MS` |
+| Allow a real domain (production) | `CORS_ORIGINS` — [required in prod](#configuration) |
+
+**Checking your work**
+
+| I want to… | Do this |
+|---|---|
+| Run the tests | backend `npm test` · frontend `npm run check` |
+| Click through every feature by hand | [Manual test checklist](#manual-test-checklist) |
+| Check the phone field logic | `node scripts/verify-phone.mjs` (frontend) |
+| Check performance at scale | `node scripts/bench-store.js` (backend) |
+| Confirm no form URL leaked into the bundle | `npm run build` — fails on its own |
+| Something is broken | [Troubleshooting](#troubleshooting) |
+
+**Deploying**
+
+| I want to… | Do this |
+|---|---|
+| Put it online | [Deployment](#deployment) |
+| Check it works on a real domain | See the CORS and `VITE_API_BASE_URL` rows above |
 
 ---
 
@@ -305,6 +366,87 @@ obvious the URL is not filled in yet.
 
 ---
 
+## Getting the registrations out
+
+Collecting registrations is only half the job — somebody eventually needs the
+list in a spreadsheet to email people, assign mentors, or tally results.
+
+The store is `gdgoc-registration-backend/data/registrations.json`, a plain JSON
+array. Excel won't open a `.json` file, and manually pasting the array into
+Google Sheets breaks the moment a name contains a comma. So use the exporter.
+
+```bash
+cd gdgoc-registration-backend
+node scripts/export-registrations.js
+```
+
+That writes `data/registrations.csv` and prints a summary:
+
+```
+  Exported 47 registration(s) -> .../data/registrations.csv
+
+  Choices per vertical (a student counts in both):
+    technical                31
+    design                   24
+    content                  12
+```
+
+Other ways to use it:
+
+```bash
+node scripts/export-registrations.js people.csv   # choose the filename
+node scripts/export-registrations.js -           # print to the terminal
+```
+
+### Opening the CSV
+
+| Tool | How |
+|---|---|
+| Google Sheets | Drive → New → File upload → pick the `.csv` |
+| Excel | Data → From Text/CSV → pick the file |
+| LibreOffice | File → Open → pick the file |
+
+### What the exporter handles
+
+- One column per field, in a fixed order, so re-running gives a diffable file.
+- Values containing commas, double quotes or newlines are quoted per RFC 4180,
+  so `"Sharma, Priya"` stays one cell instead of splitting in two.
+- Values starting with `=`, `+`, `-` or `@` get a leading tab. Without this,
+  Excel treats the cell as a **formula** — a real risk here, because a
+  `contactNumber` or a skills field could start with a minus.
+- Missing fields become empty cells rather than shifting the row.
+- CRLF line endings, which Excel prefers.
+- It never modifies `registrations.json`.
+
+### The duplicate warning
+
+If `Exported 47` but you see `47 submissions but 45 distinct roll numbers`, the
+same person submitted twice. The API does not block this yet — see
+[Going live](#going-live).
+
+### Getting the CSV to the organisers
+
+`registrations.csv` is git-ignored, so running `git add -A` after an export will
+**not** commit real names and phone numbers. That is deliberate — the export is
+a working file, not source. Send it to the organisers however you like (email,
+shared drive, Slack); just don't `git add -f` it.
+
+See [What stays out of git](#what-stays-out-of-git-and-why).
+
+### Backups
+
+There is no database server, so the only backup is the file itself. Copy
+`registrations.json` somewhere durable regularly:
+
+```bash
+# examples
+copy data\registrations.json D:\gdgoc-backups\registrations-2026-10-02.json
+```
+
+Do this **before** you deploy any change that touches the API.
+
+---
+
 ## Why it is split in two
 
 Because the backend holds things the browser must not see, and writes things the
@@ -458,6 +600,49 @@ The 8 verticals are declared twice on purpose: display labels and blurbs in
 `config/verticals.js` (backend). Keep the `key` values byte-identical between
 them, including the `pr and sponsership` spelling.
 
+#### Changing the verticals
+
+**Renaming the label or blurb** (what the student sees) — edit only
+`src/config/verticals.ts`:
+
+```ts
+{
+  key: 'technical',
+  label: 'Technical',          // the card heading
+  blurb: 'Build things that work.',   // the one-line description
+}
+```
+
+Leave `key` alone unless you are following the rename steps below — it is the
+join between the two files.
+
+**Reordering** — the array order in `src/config/verticals.ts` is the display
+order. Cut and paste the whole object; do not reindex anything.
+
+**Adding or removing a vertical** takes edits in both files:
+
+1. `gdgoc-registration-backend/config/verticals.js` — add the `key` and
+   `formUrl`. This is the one that must not break; see
+   [task 2](#2-replace-the-placeholder-google-form-urls).
+2. `gdgoc-registration-frontend/src/config/verticals.ts` — add the matching
+   object with the **same** `key`.
+3. Add a test fixture to the backend lookup/register tests if you want coverage.
+
+Then confirm both files agree:
+
+```bash
+cd gdgoc-registration-backend
+npm test
+```
+
+The tests iterate over every vertical in `config/verticals.js`, so a key that
+exists in one file but not the other fails there rather than silently in
+production.
+
+**Removing a vertical** — delete it from both files. Existing registrations that
+reference it will still export fine; the CSV just keeps the old name in the
+`priority1` / `priority2` columns.
+
 ---
 
 ## Configuration
@@ -515,8 +700,9 @@ gdgoc-registration-backend/
     validation.js           every rule the server enforces
     security.js             URL sanitising, throttling, text cleanup
   scripts/
-    seed-test-data.js       regenerate the test roster
-    bench-store.js          throughput and duplicate-registration check
+seed-test-data.js       regenerate the test roster
+export-registrations.js turn the submission log into a spreadsheet CSV
+bench-store.js          throughput and duplicate-registration check
   test/api.test.js          30 tests
 
 gdgoc-registration-frontend/
@@ -566,6 +752,38 @@ node scripts/seed-test-data.js              # rebuild the 19-student roster
 node scripts/seed-test-data.js --reset-only # just clear the log
 ```
 
+### Manual test checklist
+
+Automated tests cover the API and the data rules, but they cannot click. After
+changing anything in `src/`, walk this list once. It takes about five minutes.
+
+```bash
+npm run dev:all
+```
+
+Then, at `http://localhost:5173`:
+
+| # | Do this | Expect |
+|---|---|---|
+| 1 | Open the page | Neumorphic card, no console errors |
+| 2 | Type `26I9001` and search | Student details fill in automatically |
+| 3 | Search a roll number that doesn't exist | Clear "not found" message, no crash |
+| 4 | Switch EN ↔ HI | All labels change, the thumb slides, choice is remembered |
+| 5 | Type a phone number | Field stays inside its pill, no scrollbar |
+| 6 | Click **elsewhere** on the pill, then type | Focus ring returns correctly |
+| 7 | Pick priority 1, then priority 2 | The other verticals grey out and can't be clicked |
+| 8 | Finish and submit | Success screen with **only your two** form links |
+| 9 | Click one of those links | Opens the right form |
+| 10 | Submit, then reload and submit again | Both succeed — the known duplicate gap |
+| 11 | Resize to a phone width | Layout holds, nothing clipped |
+| 12 | Stop the backend, then search | Friendly "can't reach the API" message, not a blank screen |
+
+Step 12 is the one people forget to check, and it's the failure students
+actually see when the API is down on the day.
+
+If you changed dropdown options, also confirm the new option appears in **both**
+the form and the backend's validation.
+
 ---
 
 ## Troubleshooting
@@ -600,6 +818,82 @@ That vertical's URL is still a `placeholder-` value. See
 **Submission says the roll number is already registered**
 It is not — the API has no duplicate protection yet. Check
 `data/registrations.json` by hand. See [Going live](#going-live).
+
+---
+
+## Deployment
+
+The two halves deploy separately, and that's the point of the split: the
+frontend is static files that anyone can host for free, and only the API
+needs a server.
+
+| | Frontend | Backend |
+|---|---|---|
+| Output | static files in `dist/` | a running Node process |
+| Needs | any static host | Node 18+ with a **persistent disk** |
+| Holds personal data | no | **yes** |
+
+### Frontend — any static host
+
+```bash
+cd gdgoc-registration-frontend
+npm run build
+```
+
+Upload the contents of `dist/` to Netlify, Vercel, GitHub Pages, Cloudflare
+Pages or Firebase Hosting. There is no server-side component and no build step
+the host needs to know about — point it at `dist/` and upload.
+
+**Setting the API address.** The dev proxy only exists in development, so in
+production the browser calls the API directly and must be told where:
+
+```bash
+# build with the live API URL (no trailing slash)
+VITE_API_BASE_URL=https://api.example.com npm run build
+```
+
+Baked into the bundle at build time — rebuild after changing it. Forgetting
+this is the usual cause of the "can't reach the API" message in production.
+
+If you host the API at the same domain under `/api`, you can leave
+`VITE_API_BASE_URL` unset and serve the frontend with a rewrite rule.
+
+### Backend — any Node host
+
+Needs a persistent disk, because `registrations.json` lives on the filesystem.
+An ephemeral container (Heroku dynos, AWS Lambda, most free tiers) **loses every
+registration on redeploy.** If your host is ephemeral, move `DATA_DIR` to a
+mounted volume or object storage first.
+
+```bash
+cd gdgoc-registration-backend
+npm install --omit=dev
+NODE_ENV=production \
+CORS_ORIGINS=https://your-frontend-domain \
+PORT=3000 \
+node src/server.js
+```
+
+Required in production, or the API refuses to start:
+
+| Variable | Example | Why |
+|---|---|---|
+| `CORS_ORIGINS` | `https://gogc.example.com` | Exact origins, comma-separated. `NODE_ENV=production` with this unset is a hard startup failure — deliberate. |
+| `NODE_ENV` | `production` | Hides error detail, tightens CORS |
+
+Put these in your host's dashboard or a `.env` file your platform reads. Do
+**not** commit a `.env` — it is git-ignored, and it contains your domain.
+
+### After deploying
+
+```bash
+curl https://api.example.com/api/health     # expect {"ok":true,...}
+```
+
+Then run the [manual test checklist](#manual-test-checklist) against the real
+URL. The one that matters most on a real domain is CORS: open the browser
+console, and a `CORS policy` error means `CORS_ORIGINS` doesn't match your
+frontend origin exactly — including the protocol, and with no trailing slash.
 
 ---
 

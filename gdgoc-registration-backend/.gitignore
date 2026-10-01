@@ -3,6 +3,8 @@ node_modules/
 # Personal data — never commit the roster or submitted registrations.
 data/students.json
 data/registrations.json
+# The CSV export holds the same names and phone numbers as the log.
+registrations.csv
 data/*.tmp
 
 .env

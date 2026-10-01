@@ -56,6 +56,7 @@ Test roll numbers: `26I9001` (normal), `26I9009` (single-section branch),
 | **Run the app** | `cd gdgoc-registration-frontend` → `npm run dev:all` |
 | **Get the test roster back** | `cd gdgoc-registration-backend` → `node scripts/seed-test-data.js` |
 | **Clear submitted registrations only** | `node scripts/seed-test-data.js --reset-only` |
+| **Get registrations into a spreadsheet** | `node scripts/export-registrations.js` in the backend - writes a `.csv` and tallies each vertical |
 | **Load the real student list** | Edit `gdgoc-registration-backend/data/students.json` (no restart — re-read every 30s) |
 | **Use a roster without editing the repo** | Set `DATA_DIR` to the folder holding your `students.json` |
 | **Put in the real Google Form URLs** | Edit `gdgoc-registration-backend/config/verticals.js` |
@@ -64,6 +65,8 @@ Test roll numbers: `26I9001` (normal), `26I9009` (single-section branch),
 | **Change colours or theme** | `gdgoc-registration-frontend/src/index.css` |
 | **Change the Hindi/English wording** | `gdgoc-registration-frontend/src/i18n/dictionaries.ts` |
 | **Run the tests** | backend: `npm test` · frontend: `npm run check` |
+| **Click through everything by hand** | **Manual test checklist** in the [full guide](gdgoc-registration-frontend/README.md#manual-test-checklist) |
+| **Put it online** | [Deployment](gdgoc-registration-frontend/README.md#deployment) in the full guide |
 | **Regenerate the light/dark logos** | `node scripts/make-logo-variants.mjs` in the frontend |
 | **Check the phone field** | `node scripts/verify-phone.mjs` in the frontend |
 | **Benchmark the JSON store** | `node scripts/bench-store.js` in the backend |

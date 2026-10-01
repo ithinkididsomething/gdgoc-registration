@@ -6,6 +6,8 @@ dist-ssr/
 # Personal data — never commit. Each project also ignores its own copy.
 data/students.json
 data/registrations.json
+# The CSV export holds the same names and phone numbers as the log.
+**/registrations.csv
 data/*.tmp
 
 # Secrets and local overrides
