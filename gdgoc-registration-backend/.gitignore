@@ -1,0 +1,14 @@
+node_modules/
+
+# Personal data — never commit the roster or submitted registrations.
+data/students.json
+data/registrations.json
+data/*.tmp
+
+.env
+.env.*
+!.env.example
+
+npm-debug.log*
+.DS_Store
+Thumbs.db

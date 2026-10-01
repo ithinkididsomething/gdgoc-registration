@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#EEF2F7" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="GDG Fresher's Recruitment registration — GDGoC IET DAVV, Indore. Session 2026-27."
+    />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>GDG Fresher's Recruitment — Registration | GDGoC IET DAVV</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      // Applies the stored/system theme before first paint. Without this, users
+      // with a dark OS get a white flash on every page load, because React has
+      // not mounted yet and cannot have set the class.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('gdgoc.theme')
+          var dark =
+            stored === 'dark' ||
+            ((stored === null || stored === 'system') &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) document.documentElement.classList.add('dark')
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        } catch (e) {
+          /* storage blocked - fall back to light */
+        }
+      })()
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
