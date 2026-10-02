@@ -370,6 +370,65 @@ through **and reported**, so you can decide whether to add a real option to
 still display in the form — the branch field injects unknown values — but they
 are not selectable from a fresh dropdown.
 
+#### Enrollment number format
+
+The official format is **two-digit year (24, 25 or 26) + one branch letter +
+exactly four digits** — `26C1149`, `25B3010`, `24D1018`. The importer audits
+every row against it and prints the result:
+
+```
+  Enrollment number format
+    official (24|25|26)(letter)(4 digits) : 566
+    other ID schemes, still imported     : 154
+        54 x 999999999999
+        37 x AA99999
+        20 x AA9999999
+         5 x AA-9A99-99
+```
+
+**Those 154 are not typos.** The export legitimately contains several other ID
+schemes:
+
+| Shape | Example | Likely cohort |
+|---|---|---|
+| 12 digits | `260310001170` | a student ID rather than an enrollment number |
+| 2 letters + 5 digits | `DD25010`, `DE24092` | a `DD`/`DE` prefix scheme |
+| 2 letters + 7 digits | `DE2402288` | same, longer form |
+| `AA-2K26-NN` | `CS-2K26-01` | a batch code — `2K26` reads as 2nd year, 2026 |
+| 3-digit year | `260C1020` | `260` instead of `26` |
+
+They are **imported by default**, because dropping them would stop 154 real
+students from looking themselves up. To drop them anyway:
+
+```bash
+node scripts/import-google-form.js "<export>.json" --strict-roll
+```
+
+A handful of rows are plainly junk rather than another scheme — `Test1`,
+`Clouddevopshub`, `26000000000000000`, bare numbers like `32`. No filter
+guesses at those; check them by hand and delete them from `students.json`.
+
+Roll numbers are upper-cased on import. The export mixes `26C1234` and
+`26c1234`; lookup is case-insensitive and there are no case-only collisions, so
+this is purely cosmetic — it just stops the roster looking half-typed.
+
+#### Branch letters are consistent
+
+Worth knowing, because it confirms the data is clean: every branch uses exactly
+one letter, with no mixing.
+
+| Branch | Letter | | Branch | Letter |
+|---|---|---|---|---|
+| CS | `C` | | IP | `P` |
+| IT | `I` | | EEE | `L` |
+| CSBS | `B` | | ENTC | `T` |
+| B.Design | `D` | | Electronics and Instrumentation | `E` |
+| Mechanical Engineering | `M` | | Civil Engineering | `V` |
+
+Note **CSBS uses `B`, not `C`**, and **EEE uses `L`** — neither is guessable,
+and both would be wrong if the letter were derived from the branch name. There
+are **zero** records whose letter disagrees with its branch.
+
 #### Safety
 
 - The importer **backs up** the current roster to `data/students.backup.json`

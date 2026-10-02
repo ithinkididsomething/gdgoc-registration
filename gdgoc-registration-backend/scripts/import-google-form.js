@@ -52,6 +52,19 @@ const REPORT_FILE = path.join(DATA_DIR, "import-report.json");
 const ROLL_RE = /^[A-Za-z0-9][A-Za-z0-9-]{0,31}$/;
 
 /**
+ * The official enrollment format: two-digit year (24, 25 or 26), one branch
+ * letter, then exactly four digits. e.g. 26C1149, 25B3010, 24D1018.
+ *
+ * This is only used for REPORTING unless --strict-roll is passed. The real
+ * export contains several other legitimate ID schemes alongside it - 2K26 batch
+ * codes (CS-2K26-01), 12-digit student IDs (260310001170), DD/DE prefixes
+ * (DD25010) and a three-digit year (260C1020). Excluding those by default
+ * would silently lock out real students, so the default is to import them and
+ * tell you they are there.
+ */
+const OFFICIAL_ROLL_RE = /^(?:24|25|26)[A-Za-z]\d{4}$/;
+
+/**
  * Google Forms writes the sheet's short codes ("ETC") but the app's dropdowns
  * use the canonical names ("ENTC"). Left unmapped, those students would be
  * auto-filled with a value the branch list does not contain.
@@ -127,6 +140,7 @@ function normaliseYear(raw) {
 function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
+  const strictRoll = args.includes("--strict-roll");
   const sourceArg = args.find((a) => !a.startsWith("--"));
 
   if (!sourceArg) {
@@ -208,9 +222,14 @@ function main() {
   let badRollNumber = 0;
   let unknownGender = 0;
   let unknownYear = 0;
+  const nonOfficialRolls = [];
 
   for (const { row } of byAccount.values()) {
-    const rollNumber = cell(row, "Enrollment Number", "enrollmentNumber");
+    // Uppercased for consistency: the export contains both "26C1234" and
+    // "26c1234" for the same scheme. Lookup is case-insensitive and there are
+    // no case-only collisions, so this is cosmetic - it just stops the roster
+    // looking half-typed.
+    const rollNumber = cell(row, "Enrollment Number", "enrollmentNumber").toUpperCase();
     const rawBranch = cell(row, "Branch", "branch");
     const branch = BRANCH_LOOKUP.get(rawBranch.toLowerCase()) || rawBranch;
     if (rawBranch && !BRANCH_LOOKUP.has(rawBranch.toLowerCase())) {
@@ -255,6 +274,13 @@ function main() {
         branch: entry.branch,
         skills: entry.skills,
       });
+      continue;
+    }
+
+    // Only with --strict-roll. Off by default because the export legitimately
+    // contains other ID schemes, and dropping them would lock out real people.
+    if (strictRoll && !OFFICIAL_ROLL_RE.test(rollNumber)) {
+      nonOfficialRolls.push(rollNumber);
       continue;
     }
 
@@ -307,6 +333,30 @@ function main() {
     line(`    enrollment collisions dropped  : ${collisions.length}`);
   }
   line(`    drafts excluded (never submitted): ${Math.max(0, (parsed["Drafts"] || []).length)}`);
+  line();
+
+  line("  Enrollment number format");
+  const official = finalRoster.filter((s) => OFFICIAL_ROLL_RE.test(s.rollNumber));
+  const other = finalRoster.length - official.length;
+  line(
+    `    official (24|25|26)(letter)(4 digits) : ${official.length}`
+  );
+  line(`    other ID schemes, still imported     : ${other}`);
+  if (other) {
+    const shapes = new Map();
+    for (const s of finalRoster) {
+      if (OFFICIAL_ROLL_RE.test(s.rollNumber)) continue;
+      const shape = s.rollNumber.replace(/\d/g, "9").replace(/[A-Za-z]/g, "A");
+      shapes.set(shape, (shapes.get(shape) || 0) + 1);
+    }
+    for (const [shape, n] of [...shapes].sort((a, b) => b[1] - a[1]).slice(0, 6)) {
+      line(`      ${String(n).padStart(4)} x ${shape}`);
+    }
+    line("    Re-run with --strict-roll to drop these instead.");
+  }
+  if (nonOfficialRolls.length) {
+    line(`    dropped by --strict-roll             : ${nonOfficialRolls.length}`);
+  }
   line();
 
   if (unmappedBranches.size) {
