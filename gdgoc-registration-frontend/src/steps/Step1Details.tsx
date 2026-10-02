@@ -447,6 +447,12 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           onChange={(e) => set('gender', e.target.value)}
         />
 
+{/* Email, GitHub and Instagram are deliberately NOT locked on a lookup
+            hit. Students routinely get these wrong or leave them blank on the
+            Google Form, and a hard lock left them no way to fix it - they had
+            to hit "Edit manually", which unlocks everything including their
+            verified name and branch. Identity fields stay locked; these three
+            are self-reported links, so an edit is low-risk and useful. */}
         <TextField
           label={t('fields.email')}
           inputId="field-email"
@@ -455,8 +461,7 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           placeholder={t('fields.emailPh')}
           value={details.email}
           error={show('email')}
-          hint={t('fields.emailHelp')}
-          locked={locked}
+          hint={locked ? t('fields.verifiedEditable') : t('fields.emailHelp')}
           onChange={(e) => set('email', e.target.value)}
           autoComplete="email"
           maxLength={254}
@@ -476,14 +481,13 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           maxLength={120}
         />
 
-        <TextField
+<TextField
           label={t('fields.github')}
           inputId="field-github"
           placeholder={t('fields.githubPh')}
           value={details.github}
           error={show('github')}
-          hint={t('fields.optional')}
-          locked={locked}
+          hint={locked ? t('fields.verifiedEditable') : t('fields.optional')}
           onChange={(e) => set('github', e.target.value)}
           autoComplete="off"
           spellCheck={false}
@@ -496,8 +500,7 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           placeholder={t('fields.instagramPh')}
           value={details.instagram}
           error={show('instagram')}
-          hint={t('fields.optional')}
-          locked={locked}
+          hint={locked ? t('fields.verifiedEditable') : t('fields.optional')}
           onChange={(e) => set('instagram', e.target.value)}
           autoComplete="off"
           spellCheck={false}
