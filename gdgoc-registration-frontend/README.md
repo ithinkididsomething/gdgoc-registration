@@ -116,7 +116,7 @@ lookup. A few useful ones:
 | `26I9009` | Mechanical Engineering — Section greys out and pins to A |
 | `26I9014` | Branch stored as free text, not a dropdown code |
 | `26I-9015` | A hyphen in the roll number (legal) |
-| `26i9019` | Parth Saxena — added by hand, for hands-on testing |
+| `26I9019` | A stand-in for the maintainer — edit it with your own details, never commit them |
 | `26I9999` | Not in the roster — the manual-entry path |
 
 ---

@@ -81,13 +81,14 @@ const STUDENTS = [
   // Prefer not to say, to check the 4th gender option.
   ["26I9018", "Karan Bhatt", "Civil Engineering", "A", 1, 0, "prefer-not-to-say"],
 
-  // --- The project owner's own record, for hands-on testing ---------------
-  // Only the fields below were specified; branch/year are assumed CS / A /
-  // 1st Year - edit this row if that is wrong. Socials are the none-tokens on
-  // purpose, so this record also exercises the accepted-"NA" path end to end.
+  // --- A stand-in for the project owner, for hands-on testing --------------
+  // Deliberately fictional. This file is tracked in a public repository, so
+  // it must never hold a real person's name, email, phone number or roll
+  // number - including the maintainer's own. Edit the roll/name here to test
+  // your own details without ever committing them.
   [
-    "26i9019",
-    "Parth Saxena",
+    "26I9019",
+    "Test Owner",
     "CS",
     "A",
     0,
