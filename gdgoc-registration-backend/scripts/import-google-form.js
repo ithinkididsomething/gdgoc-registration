@@ -85,6 +85,14 @@ const BRANCH_MAP = {
   EI: "Electronics and Instrumentation",
   Mech: "Mechanical Engineering",
   Civil: "Civil Engineering",
+  "B.Design": "B.Design",
+  // The integrated programmes are recorded under older short names in the
+  // export. Normalised to the canonical values used by src/config/options.ts,
+  // so the roster and the dropdown agree. "MCA Integrated IIPS" is new and has
+  // no rows in the current export; it is listed in the dropdown only.
+  "Mtech IIPS": "Mtech Integrated IIPS",
+  "Mtech SDSF": "Mtech Integrated SDF",
+  "MCA IIPS": "MCA Integrated IIPS",
 };
 
 const BRANCH_LOOKUP = new Map(

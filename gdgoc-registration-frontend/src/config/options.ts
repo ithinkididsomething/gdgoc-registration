@@ -1,7 +1,11 @@
 /**
  * Static option lists for the Step 1 form.
- * These values are validated server-side; the lists here mirror the server's
- * allowlists so the UI never offers a choice that will be rejected on submit.
+ *
+ * The server only checks that `branch` is present and within its length cap -
+ * it does not enforce an allowlist - so this list is the single source of truth
+ * for what a student can pick. Keep the `value` strings identical to the
+ * `branch` values in the roster (data/students.json), otherwise an autofilled
+ * student will not match an option here.
  */
 
 export interface BranchOption {
@@ -25,6 +29,15 @@ export const BRANCHES: readonly BranchOption[] = [
   { value: 'EEE', label: 'EEE — Electronics & Electrical', sections: ['A'] },
   { value: 'IP', label: 'IP — Industrial Production', sections: ['A'] },
   { value: 'Civil Engineering', label: 'Civil Engineering', sections: ['A'] },
+  { value: 'B.Design', label: 'B.Design — Bachelor of Design', sections: ['A'] },
+  // The integrated programmes run a single section, and none of them use the
+  // official (24|25|26)(letter)(4 digits) enrollment format - every one of
+  // these students has a batch code such as "CS-2K26-01" instead. That is why
+  // the roster keeps them: see scripts/import-google-form.js --strict-roll,
+  // which would exclude every one of them.
+  { value: 'Mtech Integrated IIPS', label: 'Mtech Integrated (IIPS)', sections: ['A'] },
+  { value: 'MCA Integrated IIPS', label: 'MCA Integrated (IIPS)', sections: ['A'] },
+  { value: 'Mtech Integrated SDF', label: 'Mtech Integrated (SDF)', sections: ['A'] },
 ]
 
 /** True when the branch runs a single section, so Section is not a choice. */
