@@ -27,6 +27,11 @@ export const en = {
   'footer.copy':
     '© 2026 All rights reserved to GDGoC IET DAVV. Contact: gdgoc@ietdavv.edu.in',
 
+  // Labels for the credit line. The names and profile URLs themselves live in
+  // components/Footer.tsx - they are proper nouns and do not change per locale.
+  'footer.createdBy': 'Originally created by',
+  'footer.qa': 'Testing/QA',
+
   'fields.rollNumber': 'Roll Number / Enrollment Number',
   'fields.rollNumberPh': 'E.G. 26I9014',
   'fields.fullName': 'Full Name',
@@ -115,6 +120,9 @@ const hi: Record<TranslationKey, string> = {
 
   'footer.copy':
     '© 2026 सर्वाधिकार सुरक्षित, GDGoC IET DAVV। संपर्क: gdgoc@ietdavv.edu.in',
+
+  'footer.createdBy': 'मूल रूप से तैयार किया',
+  'footer.qa': 'परीक्षण / गुणवत्ता जाँच',
 
   'fields.rollNumber': 'रोल नंबर / नामांकन नंबर',
   'fields.rollNumberPh': 'उदा. 26I9014',
