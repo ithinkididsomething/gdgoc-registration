@@ -34,6 +34,9 @@ export const en = {
 
   'fields.rollNumber': 'Roll Number / Enrollment Number',
   'fields.rollNumberPh': 'E.G. 26I9014',
+  'fields.rollNumberHint': 'Same as your Tech Unleash registration',
+  'fields.rollNumberReplace':
+    'That was your JEE roll number. Please replace it with your college roll number.',
   'fields.fullName': 'Full Name',
   'fields.fullNamePh': 'Enter your full name',
   'fields.branch': 'Branch',
@@ -59,6 +62,9 @@ export const en = {
   'fields.skillsPh': 'Select your interest & skills',
   'fields.optional': 'Optional',
   'fields.verifiedEditable': 'Prefilled from your registration — edit if changed',
+  'fields.yearMissing': 'Not recorded on your form — please select your year',
+  'fields.teamMessage': 'Anything you would like to tell the team?',
+  'fields.teamMessagePh': 'Your honest thoughts, in a line or two',
 
   'lookup.idle': 'We will look you up automatically.',
   'lookup.searching': 'Looking up your record…',
@@ -90,10 +96,40 @@ export const en = {
   'step2.noSelection': 'Not selected',
 
   'step3.notice': 'Registration logged for GDG IET DAVV Induction 2026-27! Complete your task forms below.',
-  'step3.priority1Cta': 'Open Priority 1 Form',
-  'step3.priority2Cta': 'Open Priority 2 Form',
+  'step3.progress': 'Form progress',
+  'step3.priority1Cta': 'Priority 1 Form',
+  'step3.priority2Cta': 'Priority 2 Form',
+  'step3.loading': 'Loading form',
+  'step3.openInNewTab': 'Open in new tab',
+  'step3.alreadySubmitted': 'Already submitted this form?',
+  'step3.continueToSecond': 'Continue to Priority 2',
+  'step3.finish': 'I have submitted both',
+  'step3.reopenForm': 'Reload form',
+  'step3.embedBlocked': 'The embedded form did not load',
+  'step3.embedBlockedHint':
+    'Your network or browser may be blocking embedded forms. Open it in a new tab to continue — your answers are not lost.',
+  'step3.allDone': 'Both forms submitted',
+  'step3.allDoneHint':
+    'That is everything. You can close this tab — if you need to redo a form, reload the page and sign in again.',
   'step3.securityNote':
-    'These links were issued specifically for your registration. Please do not share them.',
+    'These forms were issued specifically for your registration. Please do not share them.',
+
+  // Shown instead of the flow when the roll number has already registered.
+  'noted.title': 'Your response has been noted',
+  'noted.subtitle':
+    'You have already responded, so there is nothing left to fill in. Here is what we recorded.',
+  'noted.rollNumber': 'Roll number',
+  'noted.priority1': 'Priority 1',
+  'noted.priority2': 'Priority 2',
+  'noted.recordedOn': 'Recorded on',
+  'noted.formsHint':
+    'If you have not submitted a form yet, open it below and tick it off once you have.',
+  'noted.allSubmitted': 'Both forms are marked as submitted. Nothing else to do.',
+  'noted.openForm': 'open form',
+  'noted.markSubmitted': "I've submitted this",
+  'noted.submitted': 'Submitted',
+  'noted.footer':
+    'Need this changed? Contact the organisers — for security, a response cannot be edited or resubmitted from here.',
 
   'error.title': 'Submission failed',
   'error.required': 'This field is required.',
@@ -132,6 +168,9 @@ const hi: Record<TranslationKey, string> = {
 
   'fields.rollNumber': 'रोल नंबर / नामांकन नंबर',
   'fields.rollNumberPh': 'उदा. 26I9014',
+  'fields.rollNumberHint': 'टेक अनलीज़ पंजीकरण वाला ही',
+  'fields.rollNumberReplace':
+    'यह आपका JEE रोल नंबर था। कृपया इसे अपने कॉलेज रोल नंबर से बदलें।',
   'fields.fullName': 'पूरा नाम',
   'fields.fullNamePh': 'अपना पूरा नाम लिखें',
   'fields.branch': 'शाखा',
@@ -157,6 +196,9 @@ const hi: Record<TranslationKey, string> = {
   'fields.skillsPh': 'अपनी रुचि और कौशल चुनें',
   'fields.optional': 'वैकल्पिक',
   'fields.verifiedEditable': 'आपके पंजीकरण से भरा गया है — बदल गया हो तो संपादित करें',
+  'fields.yearMissing': 'आपके फ़ॉर्म में दर्ज नहीं है — कृपया अपना वर्ष चुनें',
+  'fields.teamMessage': 'टीम को कुछ कहना है?',
+  'fields.teamMessagePh': 'आपकी सच्ची बात, एक-दो पंक्तियों में',
 
   'lookup.idle': 'हम आपका रिकॉर्ड स्वतः खोजेंगे।',
   'lookup.searching': 'आपका रिकॉर्ड खोजा जा रहा है…',
@@ -188,9 +230,38 @@ const hi: Record<TranslationKey, string> = {
   'step2.noSelection': 'चयनित नहीं',
 
   'step3.notice': 'GDG IET DAVV इंडक्शन 2026-27 के लिए पंजीकरण दर्ज हो गया! नीचे अपने टास्क फ़ॉर्म पूरे करें।',
-  'step3.priority1Cta': 'प्राथमिकता 1 फ़ॉर्म खोलें',
-  'step3.priority2Cta': 'प्राथमिकता 2 फ़ॉर्म खोलें',
-  'step3.securityNote': 'ये लिंक आपके पंजीकरण के लिए विशेष रूप से जारी किए गए हैं। कृपया इन्हें साझा न करें।',
+  'step3.progress': 'फ़ॉर्म प्रगति',
+  'step3.priority1Cta': 'प्राथमिकता 1 फ़ॉर्म',
+  'step3.priority2Cta': 'प्राथमिकता 2 फ़ॉर्म',
+  'step3.loading': 'फ़ॉर्म लोड हो रहा है',
+  'step3.openInNewTab': 'नए टैब में खोलें',
+  'step3.alreadySubmitted': 'क्या यह फ़ॉर्म जमा कर दिया?',
+  'step3.continueToSecond': 'प्राथमिकता 2 पर जाएँ',
+  'step3.finish': 'मैंने दोनों जमा कर दिए',
+  'step3.reopenForm': 'फ़ॉर्म पुनः लोड करें',
+  'step3.embedBlocked': 'एम्बेड किया गया फ़ॉर्म लोड नहीं हुआ',
+  'step3.embedBlockedHint':
+    'आपका नेटवर्क या ब्राउज़र एम्बेडेड फ़ॉर्म को रोक रहा है। जारी रखने के लिए इसे नए टैब में खोलें — आपके उत्तर सुरक्षित हैं।',
+  'step3.allDone': 'दोनों फ़ॉर्म जमा हो गए',
+  'step3.allDoneHint':
+    'बस इतना ही है। आप यह टैब बंद कर सकते हैं — किसी फ़ॉर्म को दोबारा भरना हो तो पेज रीलोड करके दोबारा साइन इन करें।',
+  'step3.securityNote': 'ये फ़ॉर्म आपके पंजीकरण के लिए विशेष रूप से जारी किए गए हैं। कृपया इन्हें साझा न करें।',
+
+  'noted.title': 'आपकी प्रतिक्रिया दर्ज हो गई है',
+  'noted.subtitle':
+    'आपने पहले ही जवाब दे दिया है, इसलिए अब भरने के लिए कुछ नहीं बचा। हमने जो दर्ज किया है वह नीचे है।',
+  'noted.rollNumber': 'रोल नंबर',
+  'noted.priority1': 'प्राथमिकता 1',
+  'noted.priority2': 'प्राथमिकता 2',
+  'noted.recordedOn': 'दर्ज की गई तिथि',
+  'noted.formsHint':
+    'यदि आपने कोई फ़ॉर्म अभी तक जमा नहीं किया है, तो नीचे खोलें और जमा करने के बाद उसे चिह्नित करें।',
+  'noted.allSubmitted': 'दोनों फ़ॉर्म जमा हो चुके हैं। अब कुछ नहीं करना है।',
+  'noted.openForm': 'फ़ॉर्म खोलें',
+  'noted.markSubmitted': 'मैंने यह जमा कर दिया',
+  'noted.submitted': 'जमा हो गया',
+  'noted.footer':
+    'कुछ बदलना है? आयोजकों से संपर्क करें — सुरक्षा के लिए यहाँ प्रतिक्रिया में संशोधन या पुनः जमा संभव नहीं है।',
 
   'error.title': 'जमा करना विफल रहा',
   'error.required': 'यह फ़ील्ड आवश्यक है।',

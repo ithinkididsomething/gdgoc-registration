@@ -1,7 +1,7 @@
 # gdgoc-registration-backend
 
 The API half of the GDGoC registration portal. It owns the student roster, all
-validation, all 8 Google Form URLs, and the registration log.
+validation, all 10 Google Form URLs, and the registration log.
 
 > The **complete guide** — architecture, the frontend, the form's dropdowns,
 > deployment and troubleshooting — lives in the sibling frontend folder:
@@ -96,19 +96,21 @@ For deeper notes see [`data/README.md`](data/README.md).
 
 ## Task 2 — replace the placeholder Google Form URLs
 
-**Edit `config/verticals.js`.** Eight placeholder URLs in one object. Paste the
+**Edit `config/verticals.js`.** Ten placeholder URLs in one object. Paste the
 real link over each one.
 
 ```js
 const VERTICAL_FORMS = Object.freeze({
   content: "https://forms.google.com/placeholder-content",
   creatives: "https://forms.google.com/placeholder-creatives",
-  "production and social media": "https://forms.google.com/placeholder-prod-social",
-  marketing: "https://forms.google.com/placeholder-marketing",
-  "pr and sponsership": "https://forms.google.com/placeholder-pr-sponsorship",
-  technical: "https://forms.google.com/placeholder-technical",
-  design: "https://forms.google.com/placeholder-design",
   operations: "https://forms.google.com/placeholder-operations",
+  "social media": "https://forms.google.com/placeholder-social-media",
+  design: "https://forms.google.com/placeholder-design",
+  production: "https://forms.google.com/placeholder-production",
+  pr: "https://forms.google.com/placeholder-pr",
+  sponsorship: "https://forms.google.com/placeholder-sponsorship",
+  marketing: "https://forms.google.com/placeholder-marketing",
+  technical: "https://forms.google.com/placeholder-technical",
 });
 ```
 
@@ -123,10 +125,12 @@ Two things not to change:
 
 - **The keys are the contract with the frontend.** The browser sends the key
   back on submit and the server looks it up by exact match. Renaming a key
-  breaks that vertical.
-- **`pr and sponsership` is misspelled on purpose.** The typo exists in both
-  projects. The display label the student sees — "PR and Sponsorship" — is
-  spelled correctly.
+  breaks that vertical. `npm run check` in the frontend compares this object
+  against `src/config/verticals.ts` and the `VerticalKey` union in
+  `src/types.ts`, so drift between the three fails the build rather than
+  surfacing as a 400 to a student.
+- **The keys double as the display labels.** `verticalByKey()` falls back to
+  the key, so a key with no entry in the frontend array renders lowercased.
 
 Verify by submitting anything through the app, or hit the API directly. **In
 PowerShell, do not use `curl -d '{...}'`** — it strips the inner quotes and the
@@ -192,7 +196,7 @@ differ.
 server.js              entry point
 config/
   env.js               all environment defaults
-  verticals.js         <<< the 8 Google Form URLs
+  verticals.js         <<< the 10 Google Form URLs
 data/
   students.json        <<< the student roster (git-ignored)
   registrations.json   the growing log (git-ignored)
@@ -200,13 +204,22 @@ data/
 src/
   app.js               routes + central error handler
   students.js          roster load, cache, lookup
-  registrations.js     serialised atomic append
   validation.js        every rule the server enforces
   security.js          URL sanitising, throttling, text cleanup
-scripts/
-  seed-test-data.js    rebuild the 19-student test roster
-  bench-store.js       throughput + duplicate-registration check
-test/api.test.js       30 tests
+  store/
+    contract.js        <<< the store interface + roll identity + domain errors
+    file.js            JSON-array driver (serialised atomic append)
+    firestore.js       Firestore driver (transactional, cross-process safe)
+    index.js           driver selection via REGISTRATION_STORE
+  scripts/
+    seed-test-data.js    rebuild the 19-student test roster
+    bench-store.js       throughput + duplicate-registration check
+  test/api.test.js            end-to-end API tests
+  test/store.test.js          7 tests pinning the store seam
+  test/store-file.test.js     file driver against the shared contract
+  test/store-firestore.test.js Firestore driver against the shared contract
+  test/helpers/
+    store-contract.js         20 assertions every driver must pass
 ```
 
 ---
@@ -228,10 +241,50 @@ All optional in development; there is no `.env` file and none is needed.
 | `RATE_LIMIT_MAX_REGISTER` | `10` | Per minute, per IP |
 | `BODY_LIMIT` | `64kb` | Max request body |
 | `TRUST_PROXY_HOPS` | `0` | Trusted proxy count, for rate-limit IP resolution |
+| `REGISTRATION_STORE` | `file` | `file` (JSON) or `firestore` (Firestore) |
+| `FIREBASE_DATABASE_ID` | `(default)` | Firestore database ID. Default matches production; override only if needed |
+| `GOOGLE_APPLICATION_CREDENTIALS` | unset | Path to service-account key (local dev only) |
 
-With `NODE_ENV=production` and no `CORS_ORIGINS` the server **refuses to
+With `NODE_ENV=production` and no `CORS_ORIGIONS` the server **refuses to
 start**, rather than opening the endpoints that hand out internal form links to
 every origin.
+
+---
+
+## Firestore
+
+Set `REGISTRATION_STORE=firestore` to use Firestore instead of the JSON file.
+Both drivers pass the same 20-assertion contract suite, so switching is a config
+change rather than a rewrite.
+
+**This project's database is `(default)`.** Production needs no override.
+
+### Running the Firestore tests
+
+```bash
+# Emulator (no real data touched) — requires firebase-tools + JDK 21
+firebase emulators:exec --only firestore "npm test"
+
+# Live database — DELETES the registrations collection, needs explicit consent
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\path\to\key.json"
+$env:REGISTRATION_STORE = "firestore"
+$env:FIREBASE_DATABASE_ID = "(default)"
+$env:ALLOW_LIVE_FIRESTORE_RESET = "yes-i-understand-this-deletes-data"
+node --test test/store-firestore.test.js
+```
+
+The live suite is verified: **22/22 pass** against `(default)`.
+
+### Known Firestore gotchas
+
+- `db.recursiveDelete(collectionRef)` is a **silent no-op** on
+  `@google-cloud/firestore` v7 (shipped with `firebase-admin@14.5.0`). It
+  resolves successfully and deletes nothing. `reset()` uses explicit paged
+  batch deletes instead.
+- `markFormCompleted` with empty/junk roll numbers must return `notRegistered`
+  (404), not a raw SDK error (500). The driver guards this explicitly.
+- `submittedAt` must stay an ISO string, never a Firestore `Timestamp`, or CSV
+  export renders `[object Object]`.
 
 ---
 
@@ -250,10 +303,17 @@ loading the real roster.
 
 ## Known gaps
 
-- **Duplicate roll numbers are accepted.** Nothing rejects a second submission
-  from the same roll number. If that matters, check for an existing `rollNumber`
-  inside the write lock in `src/registrations.js` and return `409 Conflict` —
-  `rateLimit` in `src/security.js` shows the pattern.
+- **Duplicate roll numbers are rejected.** `POST /api/register` returns
+  `409 alreadyRegistered`. The check and the append happen together inside one
+  queued write (file driver) or one transaction (Firestore driver), so two
+  simultaneous requests for the same student cannot both see a free slot.
+- **The file driver's duplicate guarantee is single-process.** That write queue
+  lives in one Node process. Run two instances — two containers, `pm2 cluster`,
+  two serverless lambdas — and neither queue can see the other, so two
+  registrations arriving at once can both be accepted. The test suite fires
+  concurrent requests at one process, so it cannot catch this. **Use
+  `REGISTRATION_STORE=firestore` in production** — Firestore transactions
+  enforce the constraint across processes.
 - **`registrations.json` is not durable.** A container filesystem is wiped on
   redeploy, and it is the only record of who registered. Back it up somewhere
-  durable before the event.
+  durable before the event. **Firestore is durable by default.**

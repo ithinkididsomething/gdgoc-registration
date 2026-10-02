@@ -10,7 +10,7 @@ import {
   YEARS_OF_STUDY,
   sectionsForBranch,
 } from '../config/options'
-import type { StudentDetails } from '../types'
+import type { ExistingRegistration, StudentDetails } from '../types'
 
 /**
  * Step 1 — student details with roll-number autofill.
@@ -33,6 +33,7 @@ const EMPTY: StudentDetails = {
   github: '',
   instagram: '',
   skills: '',
+  teamMessage: '',
 }
 
 type LookupState =
@@ -147,10 +148,25 @@ function validate(details: StudentDetails, t: (k: TranslationKey) => string) {
 
   if (!details.skills) errors.skills = t('error.required')
 
+  // Trimmed before the check, so a box holding only spaces is rejected instead
+  // of passing here and then being stored as "" — the same answer the server
+  // would give, arrived at without a round trip.
+  if (!details.teamMessage.trim()) errors.teamMessage = t('error.required')
+
   return errors
 }
 
-export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails) => void }) {
+export function Step1Details({
+  onSubmit,
+  onAlreadyRegistered,
+}: {
+  onSubmit: (details: StudentDetails) => void
+  /**
+   * Called when the roll number belongs to a student who has already responded.
+   * Handed the record so the parent can confirm without a second request.
+   */
+  onAlreadyRegistered: (rollNumber: string, registration: ExistingRegistration) => void
+}) {
   const { t } = useLanguage()
   const [details, setDetails] = useState<StudentDetails>(EMPTY)
   const [errors, setErrors] = useState<Partial<Record<keyof StudentDetails, string>>>({})
@@ -171,6 +187,17 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
    * from releasing details that were already confirmed against the roster.
    */
   const jeeVerifiedRef = useRef(false)
+
+  /**
+   * The parent's "already responded" handler, kept in a ref for the same reason
+   * as `jeeVerifiedRef`: `runLookup` has an empty dependency array on purpose,
+   * so reading the prop directly would capture whatever the first render passed
+   * in and go stale when the parent re-creates the callback.
+   */
+  const alreadyRegisteredRef = useRef(onAlreadyRegistered)
+  useEffect(() => {
+    alreadyRegisteredRef.current = onAlreadyRegistered
+  }, [onAlreadyRegistered])
 
   const set = useCallback(<K extends keyof StudentDetails>(key: K, value: StudentDetails[K]) => {
     setDetails((previous) => ({ ...previous, [key]: value }))
@@ -210,6 +237,17 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
         if (controller.signal.aborted) return
 
         if (result.found) {
+          // Already responded. Stop here rather than pre-filling a form the
+          // student is not allowed to submit: the parent swaps in the "response
+          // noted" screen, and anything filled in below would be thrown away by
+          // the 409 anyway. A JEE number is a valid lookup key but not a valid
+          // thing to register against, so a returning student is only recognised
+          // by the roll number they are meant to register with.
+          if (result.registered && result.registration && !JEE_ROLL_RE.test(rollNumber)) {
+            alreadyRegisteredRef.current(rollNumber, result.registration)
+            return
+          }
+
           // A JEE number is a valid lookup key but not a valid thing to
           // register against. Keep the verified details, drop the number, and
           // ask for the college roll number instead.
@@ -265,6 +303,17 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
   // Abort any in-flight request if the step unmounts mid-flight.
   useEffect(() => () => abortRef.current?.abort(), [])
 
+  // Move focus into the roll number field the moment a JEE number is
+  // recognised and the field is cleared, so she can type the replacement
+  // immediately instead of hunting for where her text went. Keyed on the two
+  // states that mean "a number is still needed", and it only ever runs on a
+  // transition INTO one of them, so it cannot re-fire on unrelated renders.
+  useEffect(() => {
+    if (lookupState !== 'needsRollNumber' && lookupState !== 'rollNumberUnverified') return
+    const input = document.getElementById('field-rollNumber')
+    if (input instanceof HTMLElement) input.focus()
+  }, [lookupState])
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
     const found = validate(resolvedDetails, t)
@@ -278,11 +327,17 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
     }
     onSubmit({
       ...resolvedDetails,
+      // Uppercased on the way in so what is stored matches what she saw in the
+      // field. The backend canonicalises too, but doing it here means the locked
+      // details and the step-3 confirmation read back exactly as typed.
+      rollNumber: details.rollNumber.trim().toUpperCase(),
       email: details.email.trim().toLowerCase(),
       contactNumber: `+91 ${localNumber(details.contactNumber)}`,
       linkedin: details.linkedin.trim(),
       github: details.github.trim(),
       instagram: details.instagram.trim(),
+      // Trimmed so a stray trailing newline cannot pad every stored record.
+      teamMessage: details.teamMessage.trim(),
     })
   }
 
@@ -339,8 +394,23 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           placeholder={t('fields.rollNumberPh')}
           value={details.rollNumber}
           error={show('rollNumber')}
-          onChange={(e) => {
-            set('rollNumber', e.target.value)
+          // The hint follows the lookup state. When a JEE roll number has been
+          // recognised, runLookup has already blanked this field and the
+          // identity is locked, so the one thing left undone is THIS field —
+          // and it is the field she has to type into. Saying it next to the
+          // input beats leaving it to a banner several rows above.
+          hint={
+            lookupState === 'needsRollNumber' || lookupState === 'rollNumberUnverified'
+              ? t('fields.rollNumberReplace')
+              : t('fields.rollNumberHint')
+          }
+onChange={(e) => {
+                // Uppercased as she types, not just on submit: the field is the
+                // thing she reads back to check she typed the right number, and
+                // `26b1140` on screen would be a number the log never contains.
+                // A controlled input means the caret and any IME mid-word are
+                // unaffected - there is no DOM value to fight with.
+                set('rollNumber', e.target.value.toUpperCase())
             // Normally typing here releases the lock, so a mistyped number is
             // recoverable. But in needsRollNumber the lock is what holds the
             // JEE-verified details in place while they type their college
@@ -425,6 +495,24 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           onChange={(e) => set('section', e.target.value)}
         />
 
+        {/* Unlocked only when the roster supplied no year.
+         *
+         * Ten students (DE25134, DE25234, DE25242, DE25368, DE25566, DE25857,
+         * DE25913, DD25010, DE24127, DE24341) have an empty `year` in the
+         * original Google Forms export, so there is no value to lock. Locking
+         * an empty required field produced a validation error the student could
+         * not clear without "Edit manually", which unlocks the entire verified
+         * identity just to answer one question.
+         *
+         * Conditional rather than a hardcoded list of the ten: the rule that
+         * matters is "never lock a field the server did not fill in", and that
+         * keeps holding if the roster is corrected or a new blank appears. The
+         * roster is left exactly as collected.
+         *
+         * Deriving the year from the roll-number cohort was considered and
+         * rejected — the DE24 cohort splits 5 third-years to 1 second-year, so
+         * it would have been a guess written into student records.
+         */}
         <SelectField
           label={t('fields.yearOfStudy')}
           inputId="field-yearOfStudy"
@@ -433,7 +521,8 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           placeholder=""
           value={details.yearOfStudy}
           error={show('yearOfStudy')}
-          locked={locked}
+          hint={locked && !details.yearOfStudy ? t('fields.yearMissing') : undefined}
+          locked={locked && Boolean(details.yearOfStudy.trim())}
           onChange={(e) => set('yearOfStudy', e.target.value)}
         />
 
@@ -536,6 +625,19 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           maxLength={254}
         />
 
+        {/* Editable while every other verified field stays locked.
+         *
+         * The roster's LinkedIn column is the one social field that is both
+         * mandatory and full of values the validator rejects - a bare display
+         * name instead of a URL, a scheme-less "www.linkedin.com/in/...",
+         * "..". Around
+         * 250 of 720 students hit that. Locking the field meant the error
+         * landed on a value the student never typed and the only way out was
+         * "Edit manually", which unlocks the whole verified identity at once.
+         *
+         * Leaving it editable costs little: LinkedIn is a profile link, not an
+         * identity claim, and the server still validates whatever arrives.
+         * github and instagram were already unlocked for the same reason. */}
         <TextField
           label={t('fields.linkedin')}
           inputId="field-linkedin"
@@ -543,7 +645,7 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           placeholder={t('fields.linkedinPh')}
           value={details.linkedin}
           error={show('linkedin')}
-          locked={locked}
+          hint={locked ? t('fields.verifiedEditable') : t('fields.optional')}
           onChange={(e) => set('linkedin', e.target.value)}
           autoComplete="off"
           spellCheck={false}
@@ -587,6 +689,31 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           locked={locked}
           onChange={(e) => set('skills', e.target.value)}
         />
+
+        {/* Free-text note to the team.
+         *
+         * Required, and the one field on this step the roster can never fill in:
+         * every other box is either roster data or an identity claim, so this is
+         * the only one where the student has to supply something themselves. It
+         * spans both columns because a one-line pill is the wrong shape for a
+         * sentence, and it is never locked — nothing to lock it against.
+         *
+         * spellCheck stays ON here (unlike the social handles) because this is
+         * prose, and autoComplete is off so a browser cannot offer a stale
+         * value for a field the server has never seen. */}
+        <div className="sm:col-span-2">
+          <TextField
+            label={t('fields.teamMessage')}
+            inputId="field-teamMessage"
+            placeholder={t('fields.teamMessagePh')}
+            value={details.teamMessage}
+            required
+            error={show('teamMessage')}
+            onChange={(e) => set('teamMessage', e.target.value)}
+            autoComplete="off"
+            maxLength={500}
+          />
+        </div>
       </div>
 
       <button type="submit" className="neu-btn mt-8 w-full py-4 text-sm font-extrabold tracking-wide">

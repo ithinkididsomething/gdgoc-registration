@@ -36,6 +36,9 @@ const LIMITS = Object.freeze({
   email: 254,
   social: 120,
   skills: 500,
+  // Free-text note to the team. Required, and capped so one very long answer
+  // cannot bloat the JSON store or the CSV cell.
+  teamMessage: 500,
 });
 
 /** Accepts 26I9014, 26-i-1143, etc. Rejects path chars, quotes, spaces. */
@@ -162,7 +165,14 @@ function validateRegistration(body) {
   const src = body && typeof body === "object" && !Array.isArray(body) ? body : {};
 
   // --- Identity -----------------------------------------------------------
-  const rollNumber = required(text(src.rollNumber), "rollNumber", errors, LIMITS.rollNumber);
+  // Canonicalised to UPPERCASE here, once, so the stored log and the CSV the
+  // organisers read never disagree with the roster: `26B1140`, never `26b1140`
+  // or `26B1140 `. Whitespace is already collapsed by `text()`.
+  //
+  // Duplicate detection is unaffected — it compares a lowercased key, so a row
+  // written before this change still matches a mixed-case submission instead of
+  // slipping past as a "different" student.
+  const rollNumber = required(text(src.rollNumber), "rollNumber", errors, LIMITS.rollNumber).toUpperCase();
   if (rollNumber && !ROLL_NUMBER_RE.test(rollNumber)) {
     errors.rollNumber = "rollNumber may only contain letters, digits and hyphens";
   }
@@ -228,6 +238,18 @@ function validateRegistration(body) {
     errors.priority2 = "priority2 must be different from priority1";
   }
 
+  // --- Team note ----------------------------------------------------------
+  // Required. Enforced here and not only in the UI, because the client check is
+  // trivially bypassable — the browser is not the thing that decides what gets
+  // stored. `text()` collapses whitespace first, so a box holding only spaces
+  // arrives here as "" and fails the same way an empty one does.
+  const teamMessage = required(
+    text(src.teamMessage),
+    "teamMessage",
+    errors,
+    LIMITS.teamMessage
+  );
+
   if (Object.keys(errors).length > 0) throw new ValidationError(errors);
 
   // Explicit allowlist of stored fields — nothing else is persisted.
@@ -244,6 +266,7 @@ function validateRegistration(body) {
     github,
     instagram,
     skills: clamp(text(src.skills), LIMITS.skills),
+    teamMessage,
   };
 
   return { record, priority1, priority2 };

@@ -1,45 +1,78 @@
 "use strict";
 
 /**
- * Canonical map of the 8 GDGoC verticals to their Google Form URLs.
+ * Canonical map of the 10 GDGoC verticals to their Google Form URLs.
  *
  * ============================================================================
- * TO GO LIVE: replace each `https://forms.google.com/placeholder-*` value below
- * with the real form URL for that vertical. Nothing else needs to change — the
- * keys are the contract with the frontend and must not be renamed.
+ * TO GO LIVE: replace the PLACEHOLDER_FORM_URL value below with each vertical's
+ * real form URL. Nothing else needs to change — the keys are the contract with
+ * the frontend and must not be renamed.
  *
- *   content                   -> Content .................. placeholder-content
- *   creatives                 -> Creatives ................ placeholder-creatives
- *   production and social media-> Production and Social .... placeholder-prod-social
- *   marketing                 -> Marketing ................ placeholder-marketing
- *   pr and sponsership        -> PR and Sponsorship ....... placeholder-pr-sponsorship
- *   technical                 -> Technical ................ placeholder-technical
- *   design                    -> Design ................... placeholder-design
- *   operations                -> Operations ............... placeholder-operations
+ * The ten keys, in display order:
+ *   content      -> Content ................. sharing one form
+ *   creatives    -> Creatives ............... sharing one form
+ *   operations   -> Operations .............. sharing one form
+ *   social media -> Social Media ............ sharing one form
+ *   design       -> Design .................. sharing one form
+ *   production   -> Production .............. sharing one form
+ *   pr           -> PR ...................... sharing one form
+ *   sponsorship  -> Sponsorship ............. sharing one form
+ *   marketing    -> Marketing ............... sharing one form
+ *   technical    -> Technical ............... sharing one form
+ *
+ * NOTE ON HISTORICAL DATA: registrations stored before this list was finalised
+ * may carry older combined keys ("production and social media", "pr and
+ * sponsership"). Those are intentionally NOT accepted any more, and existing log
+ * rows are left exactly as submitted — the log is a record of what students
+ * chose, not a live config mirror. Rewriting it would falsify history.
  *
  * A typical URL looks like:
  *   https://docs.google.com/forms/d/e/<FORM_ID>/viewform
  * The `/edit` variant works too; it just pre-fills for an owner.
  *
- * Until these are real, the returned links land on a Google 404. That is
- * intentional and makes it obvious during testing that the link pipeline works
- * end to end while still being obvious that the URL is not filled in yet.
+ * The frontend embeds these in an iframe and adds `embedded=true` itself, so do
+ * not bake that parameter into the value stored here.
+ *
+ * Until each vertical has its own form, the remaining nine point at
+ * PLACEHOLDER_FORM_URL so the embed works end to end during testing instead of
+ * 404ing. `marketing` already has its own (MARKETING_FORM_URL).
  * ============================================================================
  *
  * SECURITY: this object is never serialised into an API response. The register
  * handler resolves exactly the two keys the student chose and returns only
- * those, so the other 6 form links are never reachable from the client.
+ * those, so the other 8 form links are never reachable from the client.
  * `Object.freeze` prevents accidental runtime mutation.
  */
+/**
+ * The single real form currently wired up, used for the nine verticals that do
+ * not yet have their own form, while the per-vertical forms are still being
+ * created.
+ *
+ * The query string is deliberately absent: the frontend appends the embed flag
+ * itself at render time (see toEmbedUrl in Step3Forms.tsx), so this stays the
+ * canonical shareable link.
+ *
+ * Replace each value below with that vertical's own form, and delete this
+ * constant once none of the ten still point at it.
+ */
+const PLACEHOLDER_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSesiqfpUgiyJwz1wNzGbCm0rqKj-ZcvV5_pOrVqnBNesbkHOw/viewform";
+
+/** Marketing's own form — the first vertical split off the shared link. */
+const MARKETING_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSfLYBYfrdp1YUxes8kBkphm15sfu_Se6Z4_580eATUgr7EaMQ/viewform";
+
 const VERTICAL_FORMS = Object.freeze({
-  content: "https://forms.google.com/placeholder-content",
-  creatives: "https://forms.google.com/placeholder-creatives",
-  "production and social media": "https://forms.google.com/placeholder-prod-social",
-  marketing: "https://forms.google.com/placeholder-marketing",
-  "pr and sponsership": "https://forms.google.com/placeholder-pr-sponsorship",
-  technical: "https://forms.google.com/placeholder-technical",
-  design: "https://forms.google.com/placeholder-design",
-  operations: "https://forms.google.com/placeholder-operations",
+  content: PLACEHOLDER_FORM_URL,
+  creatives: PLACEHOLDER_FORM_URL,
+  operations: PLACEHOLDER_FORM_URL,
+  "social media": PLACEHOLDER_FORM_URL,
+  design: PLACEHOLDER_FORM_URL,
+  production: PLACEHOLDER_FORM_URL,
+  pr: PLACEHOLDER_FORM_URL,
+  sponsorship: PLACEHOLDER_FORM_URL,
+  marketing: MARKETING_FORM_URL,
+  technical: PLACEHOLDER_FORM_URL,
 });
 
 /** Immutable allowlist of valid vertical keys, in display order. */

@@ -55,12 +55,38 @@ const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.join(ROOT_DIR, "data");
 
+/**
+ * Which engine stores registrations. `file` keeps a JSON array under DATA_DIR.
+ * `firestore` uses the cloud database and needs no DATA_DIR at all.
+ *
+ * Default is `firestore` for production. Local dev without credentials should
+ * set REGISTRATION_STORE=file to use the JSON file instead.
+ */
+const REGISTRATION_STORE = (process.env.REGISTRATION_STORE || "firestore").toLowerCase();
+
+/**
+ * Which Firestore database to talk to.
+ *
+ * Firestore databases are addressed as `projects/<project>/databases/<id>`, and
+ * a project can hold several. The Firebase console's "Create database" button
+ * offers `(default)`, but nothing forces you to accept it, and the Admin SDK's
+ * bare `getFirestore()` ONLY ever means `(default)`.
+ *
+ * So a project whose database was named anything else - `gdgregs`, `prod`,
+ * `registrations` - fails with a bare `NOT_FOUND` and no explanation, which is a
+ * genuinely miserable hour to lose. Setting this explicitly removes the trap.
+ */
+const FIREBASE_DATABASE_ID = process.env.FIREBASE_DATABASE_ID || "(default)";
+
 const env = Object.freeze({
   NODE_ENV,
   IS_PRODUCTION,
 
   HOST: process.env.HOST || "0.0.0.0",
   PORT: intFromEnv("PORT", 3000),
+
+  REGISTRATION_STORE,
+  FIREBASE_DATABASE_ID,
 
   ROOT_DIR,
   DATA_DIR,

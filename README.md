@@ -9,7 +9,7 @@ This repository holds both halves of the app:
 | Folder | Runs on | Owns |
 |---|---|---|
 | [`gdgoc-registration-frontend/`](gdgoc-registration-frontend) | `:5173` | The form, light/dark theme, English/Hindi |
-| [`gdgoc-registration-backend/`](gdgoc-registration-backend) | `:3000` | The student roster, validation, all 8 form URLs, the registration log |
+| [`gdgoc-registration-backend/`](gdgoc-registration-backend) | `:3000` | The student roster, validation, all 10 form URLs, the registration log |
 
 ---
 
@@ -94,7 +94,7 @@ Full detail for each of these is in the [backend notes](gdgoc-registration-backe
 No code change, no restart (it re-reads from disk every 30s).
 
 **2. Replace the placeholder Google Form URLs** → edit
-`gdgoc-registration-backend/config/verticals.js`. Eight URLs, one object, paste
+`gdgoc-registration-backend/config/verticals.js`. Ten URLs, one object, paste
 the real links over them.
 
 Both steps have copy-pasteable examples and verification commands in the
@@ -103,10 +103,79 @@ change.
 
 ---
 
+## Deploying it
+
+### The one thing that decides your hosting
+
+The backend keeps registrations in `data/registrations.json` and rewrites it on
+every submission. **It therefore needs a real, persistent filesystem.** A
+serverless platform with an ephemeral one (Vercel functions, Cloudflare
+Workers, AWS Lambda) will accept registrations, hand out form links, and then
+throw the record away when the instance recycles — which is worse than failing,
+because nothing looks broken.
+
+So: **frontend on Vercel, backend on a host with a disk** (Render, Railway or
+Fly.io all have free tiers). The frontend is a static Vite build with no router,
+so Vercel serves it with no extra configuration.
+
+### Getting the roster onto a deploy host
+
+`data/students.json` is gitignored, so a deploy built from Git has **no roster**
+and every lookup quietly returns `found: false`. `npm run build` fixes this by
+calling `scripts/seed-roster.js`, which materialises the roster from whichever
+channel the host provides — first match wins:
+
+| Variable | Use it when | Limit |
+| --- | --- | --- |
+| `STUDENTS_FILE_PATH` | the host can mount a file (Render secret files, a Docker image, an SSH volume) | none — **preferred** |
+| `STUDENTS_JSON_B64_FILE` | you have a file but not a usable variable (Windows caps one env var at 32,767 chars) | none |
+| `STUDENTS_JSON_B64` | the host's dashboard only takes variables, e.g. Vercel | 64 KB per variable |
+
+The last two read a payload produced by:
+
+```bash
+cd gdgoc-registration-backend && npm run encode-roster
+```
+
+which prints the sizes and writes `dist/roster.b64.txt`:
+
+```
+brotli    38.9 KB   fits, 25.1 KB to spare
+gzip      46.5 KB   fits, 17.5 KB to spare
+raw      321.9 KB   EXCEEDS the 64.0 KB host limit
+```
+
+That compression is the whole point: plain base64 is 322 KB and **will not
+fit**. Brotli takes 241 KB of JSON down to ~39 KB, because 720 rows of repeated
+keys and branch names compress very well. `brotli` and `gzip` are both built
+into Node's `zlib`, so there is no dependency to add.
+
+> The payload is still every student's name, phone number, email and socials.
+> It belongs in your host's secret store — never in git, never in a shared doc.
+> Rotate it if it leaks.
+
+### Env vars to set in production
+
+- `CORS_ORIGINS` — **required**. In production the server refuses to start
+  without it rather than opening the endpoints that hand out internal form
+  links. Comma-separated exact origins, no trailing slash.
+- `TRUST_PROXY_HOPS=1` if there is exactly one proxy in front (Render, nginx,
+  a platform load balancer), otherwise the rate limiter resolves the wrong
+  client IP.
+- `EXPORT_TOKEN` if you want the CSV export at all. Unset means the route does
+  not exist.
+- `VITE_API_BASE_URL` on the **frontend**, pointing at the backend, since the
+  two are on different origins. That origin must appear in `CORS_ORIGINS`.
+
+Not done yet: `config/verticals.js` still holds placeholder form URLs, so a
+deployed build will hand students dead links until those are filled in.
+
+---
+
 ## Before you commit
 
 ```bash
-cd gdgoc-registration-backend  && npm test          # 30 tests
+cd gdgoc-registration-backend  && npm test          # 43 tests
 cd ../gdgoc-registration-frontend && npm run check   # lint + build + guard
 ```
 

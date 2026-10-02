@@ -1,13 +1,16 @@
 import type { Vertical } from '../types'
 
 /**
- * The 8 GDG verticals, in the order the spec lists them.
+ * The 10 GDG verticals, in the order the final spec lists them.
  *
  * SECURITY: this file contains display labels ONLY. Not a single Google Form
  * URL is bundled into the frontend. The `key` values are the identifiers the
  * server validates against — they must stay byte-identical to
- * config/verticals.js on the backend, including the "sponsership" spelling.
- * Form URLs are only ever learned at runtime from the /api/register response.
+ * config/verticals.js on the backend. Form URLs are only ever learned at
+ * runtime from the /api/register response.
+ *
+ * Order matters: it is the order the dropdown presents and the order the
+ * backend exposes via VERTICAL_KEYS.
  */
 export const VERTICALS: readonly Vertical[] = [
   {
@@ -23,28 +26,16 @@ export const VERTICALS: readonly Vertical[] = [
     blurb: 'Video, photography, graphic design',
   },
   {
-    key: 'production and social media',
-    label: 'Production and Social Media',
-    labelHi: 'प्रोडक्शन और सोशल मीडिया',
-    blurb: 'Event production, reels, community reach',
+    key: 'operations',
+    label: 'Operations',
+    labelHi: 'ऑपरेशन्स',
+    blurb: 'Logistics, events, team management',
   },
   {
-    key: 'marketing',
-    label: 'Marketing',
-    labelHi: 'मार्केटिंग',
-    blurb: 'Campaigns, growth, partnerships',
-  },
-  {
-    key: 'pr and sponsership',
-    label: 'PR and Sponsorship',
-    labelHi: 'पीआर और स्पॉन्सरशिप',
-    blurb: 'Outreach, sponsors, public relations',
-  },
-  {
-    key: 'technical',
-    label: 'Technical',
-    labelHi: 'टेक्निकल',
-    blurb: 'Code, app development, workshops',
+    key: 'social media',
+    label: 'Social Media',
+    labelHi: 'सोशल मीडिया',
+    blurb: 'Reels, community reach, content calendars',
   },
   {
     key: 'design',
@@ -53,10 +44,34 @@ export const VERTICALS: readonly Vertical[] = [
     blurb: 'UI/UX, product design, branding',
   },
   {
-    key: 'operations',
-    label: 'Operations',
-    labelHi: 'ऑपरेशन्स',
-    blurb: 'Logistics, events, team management',
+    key: 'production',
+    label: 'Production',
+    labelHi: 'प्रोडक्शन',
+    blurb: 'Event production, filming, on-ground logistics',
+  },
+  {
+    key: 'pr',
+    label: 'PR',
+    labelHi: 'पीआर',
+    blurb: 'Outreach, public relations, communications',
+  },
+  {
+    key: 'sponsorship',
+    label: 'Sponsorship',
+    labelHi: 'स्पॉन्सरशिप',
+    blurb: 'Sponsor relations, partnerships, pitching',
+  },
+  {
+    key: 'marketing',
+    label: 'Marketing',
+    labelHi: 'मार्केटिंग',
+    blurb: 'Campaigns, growth, promotions',
+  },
+  {
+    key: 'technical',
+    label: 'Technical',
+    labelHi: 'टेक्निकल',
+    blurb: 'Code, app development, workshops',
   },
 ] as const
 

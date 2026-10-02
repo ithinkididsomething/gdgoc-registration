@@ -44,7 +44,7 @@ const STEP_LABELS: Record<Step, 'steps.one' | 'steps.two' | 'steps.three'> = {
   3: 'steps.three',
 }
 
-export function Header({ step }: { step: Step }) {
+export function Header({ step }: { step?: Step }) {
   const { t } = useLanguage()
 
   return (
@@ -54,10 +54,14 @@ export function Header({ step }: { step: Step }) {
           <Logo />
           {/* The logo lockup already carries the organisation name, so only
               the step indicator is repeated as text. The image alt text covers
-              the name for screen readers, so it is not announced twice. */}
-          <p className="hidden text-[0.62rem] font-bold tracking-[0.18em] text-ink-soft/60 sm:block">
-            {t('steps.counter', { current: step, total: 3 })} · {t(STEP_LABELS[step])}
-          </p>
+              the name for screen readers, so it is not announced twice.
+              Omitted entirely when there is no step — "Step 2 of 3" above a
+              finished student's confirmation would be nonsense. */}
+          {step !== undefined ? (
+            <p className="hidden text-[0.62rem] font-bold tracking-[0.18em] text-ink-soft/60 sm:block">
+              {t('steps.counter', { current: step, total: 3 })} · {t(STEP_LABELS[step])}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-3">

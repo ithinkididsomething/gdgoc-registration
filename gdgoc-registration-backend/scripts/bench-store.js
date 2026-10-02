@@ -19,8 +19,13 @@ process.env.DATA_DIR = TMP;
 
 // Required AFTER DATA_DIR is set, because config/env.js reads it at import.
 const { env } = require("../config/env");
-const { appendRegistration } = require("../src/registrations");
+const { getStore } = require("../src/store");
 const { findStudentByRollNumber } = require("../src/students");
+
+// Benchmarked against whichever driver is configured, so this stays meaningful
+// after the store is ported rather than silently continuing to measure the old
+// engine.
+const { appendRegistration } = getStore();
 
 const BRANCHES = ["CS", "IT", "CSBS", "ENTC", "Mechanical Engineering",
   "Electronics and Instrumentation", "EEE", "IP", "Civil Engineering"];

@@ -9,7 +9,7 @@ It is two small programs that run as one app:
 | | Folder | Runs on | What it owns |
 |---|---|---|---|
 | **Frontend** | `gdgoc-registration-frontend/` | `localhost:5173` | The form, light/dark theme, English/Hindi |
-| **Backend** | `gdgoc-registration-backend/` | `localhost:3000` | The student roster, validation, all 8 form URLs, the registration log |
+| **Backend** | `gdgoc-registration-backend/` | `localhost:3000` | The student roster, validation, all 10 form URLs, the registration log |
 
 > **New here? Read [The two jobs you'll be asked to do](#the-two-jobs-youll-be-asked-to-do)
 > first — updating the student list and replacing the form links are both
@@ -486,19 +486,21 @@ are **zero** records whose letter disagrees with its branch.
 
 **File:** `gdgoc-registration-backend/config/verticals.js`
 
-Eight placeholder URLs live in one object near the top of the file. Paste the
+Ten placeholder URLs live in one object near the top of the file. Paste the
 real URL over each one. Nothing else changes.
 
 ```js
 const VERTICAL_FORMS = Object.freeze({
   content: "https://forms.google.com/placeholder-content",
   creatives: "https://forms.google.com/placeholder-creatives",
-  "production and social media": "https://forms.google.com/placeholder-prod-social",
-  marketing: "https://forms.google.com/placeholder-marketing",
-  "pr and sponsership": "https://forms.google.com/placeholder-pr-sponsorship",
-  technical: "https://forms.google.com/placeholder-technical",
-  design: "https://forms.google.com/placeholder-design",
   operations: "https://forms.google.com/placeholder-operations",
+  "social media": "https://forms.google.com/placeholder-social-media",
+  design: "https://forms.google.com/placeholder-design",
+  production: "https://forms.google.com/placeholder-production",
+  pr: "https://forms.google.com/placeholder-pr",
+  sponsorship: "https://forms.google.com/placeholder-sponsorship",
+  marketing: "https://forms.google.com/placeholder-marketing",
+  technical: "https://forms.google.com/placeholder-technical",
 });
 ```
 
@@ -516,9 +518,11 @@ const VERTICAL_FORMS = Object.freeze({
 - **Do not rename the keys.** They are the contract between the two programs. The
   frontend sends the key back on submit and the server looks it up by exact
   match. Rename one and that vertical stops working.
-- **`pr and sponsership` is misspelled on purpose.** The typo is baked into both
-  projects. Leave it alone. The *display* label is correctly spelled
-  "PR and Sponsorship" — students never see the key.
+- **Keep the three lists in step.** The keys appear in `src/types.ts` (the
+  `VerticalKey` union), `src/config/verticals.ts` (what the dropdown renders)
+  and the backend object above. `npm run check` diffs all three and fails the
+  build on any mismatch, including a change in order, so run it after editing
+  any of them.
 
 #### Check it worked
 
@@ -714,9 +718,9 @@ Do this **before** you deploy any change that touches the API.
 Because the backend holds things the browser must not see, and writes things the
 browser cannot write.
 
-1. **The 8 form URLs.** A browser downloads every byte of the JavaScript bundle,
+1. **The 10 form URLs.** A browser downloads every byte of the JavaScript bundle,
    and anyone can read it in devtools. If the forms lived in the frontend, all
-   eight would be public — including the six verticals a given student did not
+   ten would be public — including the eight verticals a given student did not
    choose, letting anyone flood those forms directly. The backend keeps them,
    resolves only the two that were picked, and returns only those two.
 2. **The roster.** Roll number to name, branch and email is personal data for
@@ -787,7 +791,7 @@ curl http://localhost:3000/api/lookup/26i9014     # case-insensitive
 ```
 
 ```json
-{ "success": true, "found": true, "student": { "rollNumber": "26I9014", "...": "..." } }
+{ "success": true, "found": true, "student": { "rollNumber": "26I9014", "...": "..." }, "registered": false }
 ```
 
 A miss returns `200` with `{"success": true, "found": false}` — the same shape
@@ -797,6 +801,49 @@ from anything else.
 A 12-digit **JEE roll number** resolves exactly like any other key. The form then
 clears it and asks for the college enrollment number instead — see
 [JEE roll numbers](#jee-roll-numbers). The number is never stored.
+
+#### `registered` and the "response noted" screen
+
+`registered` says whether this roll number has already responded. The portal
+checks it as the roll number is typed, so a returning student gets the
+**"Your response has been noted"** screen instead of filling in twelve fields
+only to be refused at the end. One response per student is the rule; this is
+what makes it feel fair rather than punitive.
+
+When `registered` is `true`, a `registration` object comes back too:
+
+```json
+{
+  "registered": true,
+  "registration": {
+    "submittedAt": "2026-10-02T18:58:57.990Z",
+    "priority1": "technical",
+    "priority2": "design",
+    "priority1CompletedAt": null,
+    "priority2CompletedAt": null,
+    "formsCompletedAt": null,
+    "forms": {
+      "priority1": { "name": "technical", "url": "https://..." },
+      "priority2": { "name": "design", "url": "https://..." }
+    }
+  }
+}
+```
+
+Three things about that payload:
+
+- **It carries no personal data.** No name, email or contact number. A roll
+  number is not a secret, so the summary reveals *that* someone registered and
+  which verticals they picked — nothing else.
+- **It re-releases exactly two form URLs**, the two this student chose. A
+  student who registered but never opened their Priority form would otherwise be
+  locked out of it forever by the very check that protects them. It is the same
+  two-key pick used at registration time, so no other vertical's link can leak.
+- **It is returned even on a roster miss** (`found:false`). Registered roll
+  numbers missing from the roster are a real case here. Withholding the summary
+  there would mean the student fills the whole form, hits a `409`, and lands on
+  a confirmation page with no links — locked out by the rule meant to protect
+  them.
 
 ### `POST /api/register`
 
@@ -810,6 +857,7 @@ Optional: `section`, `github`, `instagram`, `skills`.
 |---|---|
 | `201` | Stored. Body contains the two form links. |
 | `400` | Validation failed. Body has a per-field `fields` map. |
+| `409` | **This roll number already registered.** Body has `code: "alreadyRegistered"`. |
 | `413` | Request body over `BODY_LIMIT` (64 KB — a registration is tiny). |
 | `429` | Rate limited — 10 registrations or 30 lookups per minute per IP. |
 | `503` | The registration log has hit its size cap. |
@@ -821,6 +869,48 @@ Optional: `section`, `github`, `instagram`, `skills`.
   "fields": { "email": "email is not a valid email address" }
 }
 ```
+
+The duplicate check and the append happen together inside the store's write
+queue, so two simultaneous requests for the same roll number cannot both win —
+the second gets the `409`. Comparison ignores case and collapses whitespace, so
+`de 25234` cannot slip past `DE25234`. Historical duplicates are not rewritten;
+the **earliest** matching row is the one treated as the registration.
+
+The frontend also handles the `409` defensively: if it ever arrives, the student
+lands on the "response noted" screen instead of an error they cannot act on.
+
+### `POST /api/register/:rollNumber/complete`
+
+```bash
+curl -X POST http://localhost:3000/api/register/26I9014/complete \
+  -H 'Content-Type: application/json' -d '{"stage":1}'
+```
+
+`stage` must be the number `1` or `2`. Marks that Priority form as submitted:
+
+```json
+{ "success": true, "completedAt": "2026-10-02T18:58:58.132Z" }
+```
+
+| Status | When |
+|---|---|
+| `200` | Recorded, or already recorded (idempotent — safe to retry). |
+| `400` | `stage` was not `1` or `2`. |
+| `404` | No registration for that roll number. `code: "notRegistered"`. |
+
+Sets `priority1CompletedAt` / `priority2CompletedAt`, and `formsCompletedAt`
+once **both** are done. Calling it again never overwrites the first timestamp.
+
+**This is driven by a button, not detected.** The Google Form is on
+`docs.google.com` and this page is not, so the iframe cannot report a
+submission back — there is no cross-origin way to know. The student presses
+"I have submitted this form" and that statement becomes the timestamp. Treat
+these columns as *claimed*, not *verified*.
+
+If the POST fails, the frontend advances anyway and shows no tick. A student
+who genuinely filled in the form must not be stranded on a button because a
+timestamp did not save; they can retry from the "response noted" screen.
+
 
 ---
 
@@ -861,10 +951,11 @@ a convenience.
 
 ### Verticals
 
-The 8 verticals are declared twice on purpose: display labels and blurbs in
-`src/config/verticals.ts` (frontend), and the actual URLs in
-`config/verticals.js` (backend). Keep the `key` values byte-identical between
-them, including the `pr and sponsership` spelling.
+The 10 verticals are declared three times on purpose: the `VerticalKey` union in
+`src/types.ts`, the display labels and blurbs in `src/config/verticals.ts` (both
+frontend), and the actual URLs in `config/verticals.js` (backend). Keep the
+`key` values byte-identical and in the same order. `npm run check` compares all
+three and fails the build if they drift.
 
 #### Changing the verticals
 
@@ -959,12 +1050,15 @@ gdgoc-registration-backend/
     students.json           <<< THE STUDENT ROSTER
     registrations.json      the growing log — never commit
     README.md               deeper notes on both files
-  src/
-    app.js                  routes
-    students.js             roster load, cache, lookup
-    registrations.js        serialised atomic append
-    validation.js           every rule the server enforces
-    security.js             URL sanitising, throttling, text cleanup
+src/
+      app.js                  routes
+      students.js             roster load, cache, lookup
+      validation.js           every rule the server enforces
+      security.js             URL sanitising, throttling, text cleanup
+      store/
+        contract.js           <<< the store interface + roll identity + errors
+        file.js               JSON-array driver (serialised atomic append)
+        index.js              driver selection via REGISTRATION_STORE
   scripts/
     seed-test-data.js       regenerate the test roster
     import-google-form.js   build the roster from a real Google Forms export
@@ -979,7 +1073,7 @@ gdgoc-registration-frontend/
   src/
     App.tsx                 step state machine
     steps/                  Step1Details, Step2Priorities, Step3Forms
-    components/             Header, Field, Footer, toggles
+    components/             Header, Field, Footer, toggles, ResponseNoted
     config/
       options.ts            branches, sections, years, genders, skills
       verticals.ts          display labels only — no URLs
@@ -999,13 +1093,14 @@ gdgoc-registration-frontend/
 ## Testing and checks
 
 ```bash
-# Backend - 43 tests: validation, security, routes, store
+# Backend - 58 tests: validation, security, routes, store, duplicates
 cd gdgoc-registration-backend
 npm test
 
 # Frontend
 cd gdgoc-registration-frontend
 npm run lint        # oxlint
+npm run check       # lint + typecheck + build + URL leak + vertical list
 npm run build       # typecheck, build, and assert no form URL leaked
 ```
 
@@ -1044,17 +1139,24 @@ Then, at `http://localhost:5173`:
 | 7 | Pick priority 1, then priority 2 | The other verticals grey out and can't be clicked |
 | 8 | Finish and submit | Success screen with **only your two** form links |
 | 9 | Click one of those links | Opens the right form |
-| 10 | Submit, then reload and submit again | Both succeed — the known duplicate gap |
-| 11 | Resize to a phone width | Layout holds, nothing clipped |
-| 12 | Stop the backend, then search | Friendly "can't reach the API" message, not a blank screen |
-| 13 | Type a **JEE roll number** (e.g. `260310838051`) | Details fill in and lock; the number is **cleared**; prompt asks for the college roll number |
-| 14 | Type your college roll number into that field | Details **stay locked** even though it won't match the roster |
-| 15 | Stop the backend during step 14 | Details **stay locked**; message changes to "couldn't reach the server" |
+| 10 | With that roll number still in the field, reload the page and search again | **"Your response has been noted"** replaces the whole flow — no second form |
+| 11 | On that screen, press **I've submitted this** under Priority 1 | It ticks, and reload shows the tick still there |
+| 12 | Open a link from the noted screen | The right form opens in a new tab |
+| 13 | Resize to a phone width | Layout holds, nothing clipped |
+| 14 | Stop the backend, then search | Friendly "can't reach the API" message, not a blank screen |
+| 15 | Type a **JEE roll number** (e.g. `260310838051`) | Details fill in and lock; the number is **cleared**; prompt asks for the college roll number |
+| 16 | Type your college roll number into that field | Details **stay locked** even though it won't match the roster |
+| 17 | Stop the backend during step 16 | Details **stay locked**; message changes to "couldn't reach the server" |
 
-Step 12 is the one people forget to check, and it's the failure students
+Step 14 is the one people forget to check, and it's the failure students
 actually see when the API is down on the day.
 
-Steps 13–15 cover the JEE path, where the lock has to survive a lookup that
+Steps 10–12 are the duplicate rule. The bar is that a returning student types
+their roll number and is **done** — no questions, no error styling, nothing they
+can get wrong. If you ever see the normal form again for a registered roll
+number, that is a bug, not a rough edge.
+
+Steps 15–17 cover the JEE path, where the lock has to survive a lookup that
 cannot succeed. There is **no frontend test suite**, so these three are the only
 coverage that path gets — if you touch `Step1Details.tsx`, run them.
 
@@ -1093,8 +1195,17 @@ That vertical's URL is still a `placeholder-` value. See
 [Replace the placeholder URLs](#2-replace-the-placeholder-google-form-urls).
 
 **Submission says the roll number is already registered**
-It is not — the API has no duplicate protection yet. Check
-`data/registrations.json` by hand. See [Going live](#going-live).
+
+It really is — this is the one-response-per-student rule doing its job, not a
+bug. A student typing an existing roll number normally never reaches the
+submit button: the portal shows the
+["response noted" screen](#registered-and-the-response-noted-screen) as soon as
+the number is recognised. You get here when the lookup and the submission raced
+(a second tab, a stale page), and the frontend turns that `409` into the same
+confirmation screen rather than an error.
+
+To inspect the log by hand, read `data/registrations.json`. Historical duplicates
+are left alone; the earliest matching row wins. See [Going live](#going-live).
 
 ---
 
@@ -1179,7 +1290,7 @@ frontend origin exactly — including the protocol, and with no trailing slash.
 
 ## Going live
 
-- [ ] Replace all 8 placeholder URLs in `config/verticals.js`.
+- [ ] Replace all 10 placeholder URLs in `config/verticals.js`.
 - [ ] Load the real roster into `data/students.json`; confirm `rollNumber`s are unique.
 - [ ] Set `NODE_ENV=production` and an explicit `CORS_ORIGINS`.
 - [ ] Serve the frontend as static files from a CDN or static host.
@@ -1190,10 +1301,13 @@ frontend origin exactly — including the protocol, and with no trailing slash.
 - [ ] Back up `registrations.json` somewhere durable. A container filesystem is
       wiped on redeploy; this file is the only record of who registered.
 
-**Known gap:** the same roll number can be submitted more than once. If that
-matters, add a check in `src/registrations.js` that scans the log for an existing
-`rollNumber` inside the existing write lock and returns `409 Conflict` — the
-`rateLimit` helper in `src/security.js` already provides the pattern.
+**Known gap:** the duplicate guarantee is single-process. The write queue in
+  `src/store/file.js` lives in one Node process, so two instances on one host can
+  both accept a simultaneous registration for the same roll number — the queues
+  cannot see each other. The test suite only ever hits one process, so it passes
+  regardless. If you run more than one instance, move to a store whose database
+  enforces the constraint: `src/store/contract.js` is the seam, and swapping the
+  driver changes no route, no validation and no export.
 
 ---
 
@@ -1271,9 +1385,9 @@ This one **is** tracked, and that is fine today: it currently holds only
 `placeholder-` values. The moment someone pastes the real links and commits
 them, those URLs are in history permanently.
 
-That quietly breaks the main thing the architecture buys you — that the eight
+That quietly breaks the main thing the architecture buys you — that the ten
 links are only ever handed out **two at a time**, to the student who chose them.
-In git history, all eight become readable by anyone who can clone.
+In git history, all ten become readable by anyone who can clone.
 
 This is an acceptable trade **only while the repository is private** and shared
 with people who already have the links. If it is ever made public, or given to

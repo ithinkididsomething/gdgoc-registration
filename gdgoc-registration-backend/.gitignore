@@ -19,3 +19,11 @@ data/*.tmp
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Service account keys. This is the half that actually talks to Firestore, so it
+# gets its own belt-and-braces rule. See the root .gitignore for why one of these
+# committed is unrecoverable without rotating the key.
+gdgregs-*.json
+*-firebase-adminsdk-*.json
+*service-account*.json
+*service_account*.json

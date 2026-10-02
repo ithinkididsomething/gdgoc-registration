@@ -1,4 +1,10 @@
-import type { LookupResult, RegisterResult, StudentDetails, VerticalKey } from '../types'
+import type {
+  CompleteResult,
+  LookupResult,
+  RegisterResult,
+  StudentDetails,
+  VerticalKey,
+} from '../types'
 
 /**
  * Thin API client. All paths are relative so the Vite dev proxy (and a
@@ -14,12 +20,20 @@ const TIMEOUT_MS = 12_000
 export class ApiError extends Error {
   readonly status: number
   readonly fields: Record<string, string>
+  /** Stable server-side tag, e.g. "alreadyRegistered". Absent for most errors. */
+  readonly code: string | undefined
 
-  constructor(message: string, status: number, fields: Record<string, string> = {}) {
+  constructor(
+    message: string,
+    status: number,
+    fields: Record<string, string> = {},
+    code?: string,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fields = fields
+    this.code = code
   }
 }
 
@@ -75,11 +89,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     }
 
     if (!response.ok) {
-      const record = (body ?? {}) as { error?: string; fields?: Record<string, string> }
+      const record = (body ?? {}) as {
+        error?: string
+        fields?: Record<string, string>
+        code?: string
+      }
       throw new ApiError(
         record.error ?? `Request failed with HTTP ${response.status}.`,
         response.status,
         record.fields ?? {},
+        record.code,
       )
     }
 
@@ -119,4 +138,27 @@ export function register(
     method: 'POST',
     body: JSON.stringify({ ...details, priority1, priority2 }),
   })
+}
+
+/**
+ * POST /api/register/:rollNumber/complete — record that a Priority form was
+ * submitted.
+ *
+ * Driven by the student pressing "I have submitted this form". A cross-origin
+ * Google Form cannot report its own submission, so this confirmation is the only
+ * completion signal that exists.
+ *
+ * Failures are deliberately swallowed by the caller rather than thrown here: a
+ * student who has genuinely filled in the form must never be held on a button
+ * because a timestamp did not save.
+ */
+export function markFormComplete(
+  rollNumber: string,
+  stage: 1 | 2,
+): Promise<CompleteResult | null> {
+  const encoded = encodeURIComponent(rollNumber.trim())
+  return request<CompleteResult>(`/api/register/${encoded}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ stage }),
+  }).catch(() => null)
 }

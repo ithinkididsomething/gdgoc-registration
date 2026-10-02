@@ -7,10 +7,44 @@ const crypto = require("crypto");
 const { env } = require("../config/env");
 const { VERTICAL_FORMS } = require("../config/verticals");
 const { findStudentByRollNumber } = require("./students");
-const { appendRegistration, readAllRegistrations } = require("./registrations");
+const { getStore } = require("./store");
 const { toCsv } = require("./registrations-csv");
 const { validateRegistration, ValidationError } = require("./validation");
 const { isSafeObject, createRateLimiter, rateLimit, asyncHandler, clientIp } = require("./security");
+
+/**
+ * The subset of a stored registration that a student is shown about themselves.
+ *
+ * Deliberately excludes every personal field the log holds (name, email, phone,
+ * socials, the note to the team). A roll number is not a secret — it is
+ * printed on a student's ID card — so this endpoint is reachable by anyone who
+ * has one, and the fewer columns it can answer with, the smaller the surface.
+ */
+function summariseRegistration(record) {
+  const priority1 = typeof record.priority1 === "string" ? record.priority1 : "";
+  const priority2 = typeof record.priority2 === "string" ? record.priority2 : "";
+
+  // Same rule as /api/register: only ever name two keys explicitly. The
+  // verticals came from a validated submission, but a hand-edited log could hold
+  // anything, so an unknown key resolves to no URL rather than to a lookup.
+  const forms = {};
+  if (VERTICAL_FORMS[priority1]) {
+    forms.priority1 = { name: priority1, url: VERTICAL_FORMS[priority1] };
+  }
+  if (VERTICAL_FORMS[priority2]) {
+    forms.priority2 = { name: priority2, url: VERTICAL_FORMS[priority2] };
+  }
+
+  return {
+    submittedAt: record.submittedAt ?? null,
+    priority1,
+    priority2,
+    priority1CompletedAt: record.priority1CompletedAt ?? null,
+    priority2CompletedAt: record.priority2CompletedAt ?? null,
+    formsCompletedAt: record.formsCompletedAt ?? null,
+    forms,
+  };
+}
 
 /**
  * Build the Express app. Kept separate from server.js so tests can mount it
@@ -100,19 +134,56 @@ function createApp() {
    *
    * Returns the single matching student, or found:false. The roster itself is
    * never included in any response — there is no code path that returns it.
+   *
+   * Also reports whether this student has ALREADY registered, so the portal can
+   * show "response already noted" the moment a roll number is typed instead of
+   * letting them fill the whole form again and only then rejecting it.
+   *
+   * Two details worth knowing about the `registration` payload:
+   *
+   *  - It is the ONLY place a roll number is answered with a form URL after the
+   *    original registration. That is deliberate: a student who registered but
+   *    never opened their Priority form would otherwise be permanently locked
+   *    out of it by the very duplicate check that protects them. The release is
+   *    the same explicit two-key pick used at registration time — nothing
+   *    iterates VERTICAL_FORMS — so no other vertical's link can leak.
+   *
+   *  - It carries no name, email or contact number. Someone who guesses a roll
+   *    number learns that it is registered and which verticals were chosen, and
+   *    nothing else.
+   *
+   *  - It is returned even when the roll number is NOT in the roster
+   *    (`found:false`). A registered student missing from the roster is a real
+   *    case here, not a hypothetical: at least one roll number in the live data
+   *    is absent from every available roster source. Without the summary the
+   *    portal has no way to show them the confirmation, so they would fill in
+   *    the entire form, be refused with a 409, and land on a confirmation page
+   *    with no form links — locked out of their own forms by the rule that is
+   *    meant to protect them. `registered` is already reported on that path, so
+   *    withholding the summary only makes the answer useless, not safer.
    */
   app.get(
     "/api/lookup/:rollNumber",
     rateLimit(lookupLimiter),
     asyncHandler(async (req, res) => {
+      const registration = await getStore().findRegistration(req.params.rollNumber);
       const student = await findStudentByRollNumber(req.params.rollNumber);
+      const summary = registration ? summariseRegistration(registration) : undefined;
 
       if (!student) {
         // Same shape as a hit minus `student`, so a caller cannot use response
         // size or key ordering to distinguish "not in roster" from other cases.
-        return res.status(200).json({ success: true, found: false });
+        return res
+          .status(200)
+          .json({ success: true, found: false, registered: Boolean(registration), registration: summary });
       }
-      return res.status(200).json({ success: true, found: true, student });
+      return res.status(200).json({
+        success: true,
+        found: true,
+        student,
+        registered: Boolean(registration),
+        registration: summary,
+      });
     })
   );
 
@@ -120,8 +191,14 @@ function createApp() {
    * POST /api/register
    *
    * Persists the submission, then hands back only the two Google Form links the
-   * student actually chose. The remaining 6 links are never read into a
+   * student actually chose. The remaining 8 links are never read into a
    * response object.
+   *
+   * A roll number that is already registered is refused with 409 and the code
+   * `alreadyRegistered`. The UI checks this earlier, on roll-number lookup, but
+   * that check is a courtesy: this one is what actually enforces one response
+   * per student, and it has to be here because the browser cannot be trusted to
+   * have asked.
    */
   app.post(
     "/api/register",
@@ -140,7 +217,8 @@ function createApp() {
       // The chosen verticals are persisted alongside the student details —
       // they are the whole point of the application, so a log that omits them
       // cannot be used to allocate anyone to a vertical.
-      await appendRegistration({ ...record, priority1, priority2 });
+      // Throws 409 if this roll number is already in the log.
+      await getStore().appendRegistration({ ...record, priority1, priority2 });
 
       // Explicitly pick the two chosen keys. Nothing iterates over
       // VERTICAL_FORMS, so no other vertical's URL can appear here.
@@ -150,6 +228,43 @@ function createApp() {
       };
 
       return res.status(201).json({ success: true, forms });
+    })
+  );
+
+  /**
+   * POST /api/register/:rollNumber/complete
+   *
+   * Records that the student submitted one of their two Google Forms.
+   *
+   * WHY THE STUDENT HAS TO SAY SO: the forms are on docs.google.com and the
+   * portal is not, so there is no way to observe a submission. The iframe
+   * cannot read the form's DOM, and Google offers no callback. The only honest
+   * signal available is the student confirming it, which is exactly what the
+   * "I have submitted this form" button in step 3 already is — this route just
+   * makes it durable instead of a UI-only state.
+   *
+   * It can only ever set a completion timestamp on an existing row. It cannot
+   * create, alter or delete a registration, so the damage from a forged request
+   * is limited to a wrong tick on an organiser's sheet.
+   */
+  app.post(
+    "/api/register/:rollNumber/complete",
+    rateLimit(registerLimiter),
+    asyncHandler(async (req, res) => {
+      // Strictly a number. `Number()` coercion would also wave through "1",
+      // " 1 " and — worse — `true`, since Number(true) is 1, so a malformed
+      // payload could quietly stamp the wrong stage.
+      const stage = req.body?.stage;
+      if (stage !== 1 && stage !== 2) {
+        throw new ValidationError({ stage: "stage must be 1 or 2" });
+      }
+
+      const record = await getStore().markFormCompleted(req.params.rollNumber, stage);
+
+      return res.status(200).json({
+        success: true,
+        completedAt: record[`priority${stage}CompletedAt`],
+      });
     })
   );
 
@@ -186,7 +301,7 @@ function createApp() {
         return res.status(401).json({ success: false, error: "Invalid export key" });
       }
 
-      const records = await readAllRegistrations();
+      const records = await getStore().readAllRegistrations();
       const csv = toCsv(records);
 
       res.setHeader("Content-Type", "text/csv; charset=utf-8");
@@ -223,7 +338,13 @@ function createApp() {
       return res.status(status).json({ success: false, error: err.message });
     }
     if (status >= 400 && status < 500) {
-      return res.status(status).json({ success: false, error: err?.expose ? err.message : "Bad request" });
+      // `code` is a stable machine-readable tag (`alreadyRegistered`) so the
+      // client can branch on it instead of pattern-matching an English message.
+      return res.status(status).json({
+        success: false,
+        error: err?.expose ? err.message : "Bad request",
+        ...(err?.code ? { code: err.code } : {}),
+      });
     }
 
     console.error(`[error] ${req.method} ${req.path} from ${clientIp(req)}:`, err);

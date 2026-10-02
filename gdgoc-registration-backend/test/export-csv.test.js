@@ -27,15 +27,59 @@ process.env.NODE_ENV = "test";
 process.env.EXPORT_TOKEN = TOKEN;
 process.env.RATE_LIMIT_MAX_EXPORT = "1000";
 
+// Same reason as api.test.js: production defaults REGISTRATION_STORE to
+// firestore, and this suite reads and writes registrations.json directly, so it
+// has to ask for the file driver explicitly rather than inherit the default.
+process.env.REGISTRATION_STORE = "file";
+
 const { createApp } = require("../src/app");
 const { REGISTRATIONS_FILE } = require("../config/env").env;
-const { drain } = require("../src/registrations");
+// COLUMNS is imported rather than hardcoded in the round-trip test so the
+// column index stays correct if fields are reordered later.
+const { COLUMNS } = require("../src/registrations-csv");
+const { drain } = require("../src/store");
 
 let server;
 let baseUrl;
 
 async function get(pathAndQuery, init) {
   return fetch(`${baseUrl}${pathAndQuery}`, init);
+}
+
+/**
+ * Splits one CSV row, honouring quoted cells and doubled quotes. Needed
+ * because the team note is free text that legitimately contains both commas
+ * and quotes — `row.split(",")` would report the wrong cell count and hide a
+ * real escaping bug behind a passing assertion.
+ */
+function splitCsvRow(row) {
+  const cells = [];
+  let current = "";
+  let inQuotes = false;
+  for (let i = 0; i < row.length; i++) {
+    const ch = row[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (row[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ",") {
+      cells.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  cells.push(current);
+  return cells;
 }
 
 const VALID = {
@@ -51,6 +95,7 @@ const VALID = {
   github: "https://github.com/janedoe",
   instagram: "@janedoe",
   skills: "Web Development",
+  teamMessage: 'Please run more beginner workshops.',
   priority1: "technical",
   priority2: "design",
 };
@@ -126,13 +171,38 @@ test("returns CSV to the correct key, with spreadsheet-friendly headers", async 
   assert.equal(
     header,
     "submittedAt,rollNumber,fullName,branch,section,yearOfStudy,contactNumber," +
-      "gender,email,linkedin,github,instagram,skills,priority1,priority2"
+        "gender,email,linkedin,github,instagram,skills,teamMessage,priority1,priority2"
   );
   assert.equal(csv.includes("Jane Doe"), true);
   assert.equal(csv.includes("26I9014"), true);
   assert.equal(csv.includes("jane.doe@ietdavv.edu.in"), true);
+  // The new column has to carry a VALUE, not just a header — a header-only
+  // assertion would pass even if the field were dropped on the way to storage.
+  assert.equal(csv.includes("Please run more beginner workshops."), true);
   // Trailing CRLF, which is what Excel expects.
   assert.equal(csv.endsWith("\r\n"), true);
+});
+
+test("a comma or quote in the team note survives the CSV round trip", async () => {
+  await fs.writeFile(REGISTRATIONS_FILE, "[]\n");
+  const nasty = 'Ship faster, "not" slower; we can iterate.';
+  const reg = await fetch(`${baseUrl}/api/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...VALID, teamMessage: nasty }),
+  });
+  // 201, not 200 — /api/register responds "created". Asserting 200 here would
+  // have passed on a 4xx rejection if the note had tripped validation.
+  assert.equal(reg.status, 201);
+
+  const csv = await (await get(`/api/registrations.csv?key=${TOKEN}`)).text();
+  await drain();
+  const [, row] = csv.split("\r\n");
+  const cells = splitCsvRow(row);
+  assert.equal(cells.length, COLUMNS.length, "quoting must keep the cell count intact");
+  // Round trip: the parsed cell must unescape back to the original string, not
+  // a truncated prefix at the first comma.
+  assert.equal(cells[COLUMNS.indexOf("teamMessage")], nasty);
 });
 
 test("exports an empty log as a header row rather than erroring", async () => {
@@ -169,10 +239,12 @@ test("a UTF-8 BOM does not break the log", async () => {
   assert.equal(res.status, 200);
   assert.equal((await res.text()).includes("26I9014"), true);
 
+  // A different roll number: the seeded row above already claims 26I9014, and
+  // re-registering it is now correctly a 409 rather than a second row.
   const reg = await fetch(`${baseUrl}/api/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(VALID),
+    body: JSON.stringify({ ...VALID, rollNumber: "26I9015" }),
   });
   assert.equal(reg.status, 201);
 });

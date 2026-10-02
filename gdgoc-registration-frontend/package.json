@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:all": "node scripts/dev-all.mjs",
-    "build": "tsc -b && vite build && node scripts/assert-no-form-urls.mjs",
+    "build": "tsc -b && vite build && node scripts/assert-no-form-urls.mjs && node scripts/assert-verticals-match.mjs",
     "lint": "oxlint src",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit false --emitDeclarationOnly false",

@@ -8,6 +8,18 @@
  * and two implementations of the quoting rules would eventually disagree, at
  * which point a name containing a comma would break in one path and not the
  * other.
+ *
+ * ============================ READ THIS BEFORE ADDING A STORE ============
+ * `csvCell` does `String(value)` and nothing else. It has no idea what a
+ * Firestore Timestamp, a Decimal or a GeoPoint is, so a record holding one
+ * renders as the literal text `[object Object]` in the organisers' spreadsheet -
+ * no error, no warning, just a broken cell in the one file that matters.
+ *
+ * That is why the store contract requires ISO strings for `submittedAt` and the
+ * other timestamps. When you write a new store driver, store the plain string.
+ * The natural instinct with a document database is to use its native types.
+ * Here, that instinct silently corrupts the only export the event depends on.
+ * =========================================================================
  */
 
 /** Column order. Anything missing from a record becomes an empty cell. */
@@ -25,6 +37,7 @@ const COLUMNS = [
   "github",
   "instagram",
   "skills",
+  "teamMessage",
   "priority1",
   "priority2",
 ];

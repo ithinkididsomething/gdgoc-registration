@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Deny everything, on purpose.
+//
+// The registration portal has exactly one client: the Express API, using the
+// Admin SDK. The Admin SDK is a server-side credential and BYPASSES security
+// rules entirely, so nothing in this file can protect the data during normal
+// operation — it is not in the trust path.
+//
+// So why have the file at all? Because "there are no rules" and "deny
+// everything" behave very differently the moment something goes wrong:
+//
+//   - With no rules file, Firestore's default is ALLOW. A web client — or any
+//     code that ends up holding a Firebase web config — could read the whole
+//     `registrations` collection. That collection holds every student's name,
+//     email, phone number, branch and social links. There is no way to
+//     un-leak that.
+//
+//   - With this file, the default is DENY. A leaked Firebase web config is
+//     worthless on its own. An attacker would need the service account key,
+//     which lives only on the server.
+//
+// The Firestore emulator loads these rules, so `npm test` runs against the same
+// posture as production rather than against a permissive default.
+//
+// IF YOU EVER NEED BROWSER ACCESS: do not weaken this file to accommodate it.
+// The roster alone is 720 records of personal data, and `/api/lookup/:rollNumber`
+// already returns a student's full details to anyone who knows their roll
+// number. Adding a second, rules-based path to that data doubles the exposure
+// instead of reducing it. If a frontend genuinely needs direct reads, put them
+// behind a proxy you control and keep this file closed.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

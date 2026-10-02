@@ -23,7 +23,7 @@ function shutdown(signal) {
   console.log(`\n${signal} received — shutting down.`);
   server.close(() => {
     // Give queued registration writes a moment to land on disk.
-    require("./src/registrations")
+    require("./src/store")
       .drain()
       .then(() => process.exit(0))
       .catch(() => process.exit(1));

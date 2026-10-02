@@ -32,3 +32,20 @@ yarn-error.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# --- Cloud credentials -------------------------------------------------------
+# A Firebase/GCP service account key is a PASSWORD for the whole project: it
+# grants full read/write on Firestore, which here means every student's name,
+# email and phone number. Committing one leaks all of it permanently — git
+# history means deleting the file later does not undo it, and the key must be
+# rotated, not just removed.
+#
+# Only specific filenames are ignored elsewhere in this file, so `*.json` on its
+# own is NOT covered and `git add .` would happily stage a key dropped into the
+# repo. These patterns catch the names these files actually arrive under.
+gdgregs-*.json
+*-firebase-adminsdk-*.json
+*service-account*.json
+*service_account*.json
+google-credentials*.json
+gcp-key*.json

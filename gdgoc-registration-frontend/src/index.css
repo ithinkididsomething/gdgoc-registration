@@ -263,6 +263,32 @@
   }
 }
 
+/* Entrance for the step-3 form panel.
+ *
+ * Declared as a named class rather than a Tailwind arbitrary value because the
+ * cubic-bezier contains commas, which Tailwind treats as the separator inside
+ * `animate-[...]`. A class avoids that entirely and keeps the easing readable.
+ *
+ * The panel is keyed on the active form, so switching from Priority 1 to
+ * Priority 2 remounts it and this replays - which is what makes the step read as
+ * a transition rather than a jump. The prefers-reduced-motion block below
+ * neutralises it for anyone who has asked for less movement.
+ */
+@keyframes step3-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.step3-rise {
+  animation: step3-rise 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
