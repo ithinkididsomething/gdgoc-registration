@@ -63,6 +63,12 @@ export const en = {
   'lookup.idle': 'We will look you up automatically.',
   'lookup.searching': 'Looking up your record…',
   'lookup.found': 'Record found. Your details are verified and locked. Email, GitHub and Instagram stay editable.',
+  'lookup.jeeFound':
+    'Found you by your JEE roll number. Your details are filled in — please enter your college roll number below.',
+  'lookup.jeeRollUnverified':
+    'We could not match that college roll number, but your details are already filled in and verified from your JEE roll number. Please check them and continue.',
+  'lookup.jeeOffline':
+    'Could not reach the server to check that roll number. Your details are already filled in and verified — please continue.',
   'lookup.notFound': 'No record found. Please fill the form manually.',
   'lookup.failed': 'Could not reach the server. You can fill the form manually.',
   'lookup.clear': 'Edit manually',
@@ -155,6 +161,12 @@ const hi: Record<TranslationKey, string> = {
   'lookup.idle': 'हम आपका रिकॉर्ड स्वतः खोजेंगे।',
   'lookup.searching': 'आपका रिकॉर्ड खोजा जा रहा है…',
   'lookup.found': 'रिकॉर्ड मिल गया। आपका विवरण सत्यापित और लॉक है। ईमेल, गिटहब और इंस्टाग्राम संपादन योग्य हैं।',
+  'lookup.jeeFound':
+    'आपको आपके JEE रोल नंबर से ढूँढ लिया गया है। आपका विवरण भर दिया गया है — कृपया नीचे अपना कॉलेज रोल नंबर दर्ज करें।',
+  'lookup.jeeRollUnverified':
+    'वह कॉलेज रोल नंबर मेल नहीं खाया, लेकिन आपका विवरण पहले से भरा हुआ और आपके JEE रोल नंबर से सत्यापित है। कृपया जाँच कर आगे बढ़ें।',
+  'lookup.jeeOffline':
+    'रोल नंबर जाँचने के लिए सर्वर से संपर्क नहीं हो सका। आपका विवरण पहले से भरा और सत्यापित है — कृपया आगे बढ़ें।',
   'lookup.notFound': 'कोई रिकॉर्ड नहीं मिला। कृपया फ़ॉर्म स्वयं भरें।',
   'lookup.failed': 'सर्वर से संपर्क नहीं हो सका। आप फ़ॉर्म स्वयं भर सकते हैं।',
   'lookup.clear': 'स्वयं संपादित करें',

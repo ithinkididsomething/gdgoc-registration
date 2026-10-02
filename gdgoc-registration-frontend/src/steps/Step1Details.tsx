@@ -35,10 +35,30 @@ const EMPTY: StudentDetails = {
   skills: '',
 }
 
-type LookupState = 'idle' | 'searching' | 'found' | 'notFound' | 'failed'
+type LookupState =
+  | 'idle'
+  | 'searching'
+  | 'found'
+  | 'needsRollNumber'
+  | 'rollNumberUnverified'
+  | 'verifiedOffline'
+  | 'notFound'
+  | 'failed'
 
 /** Mirrors the server's ROLL_NUMBER_RE so the UI never sends a rejected value. */
 const ROLL_RE = /^[A-Za-z0-9][A-Za-z0-9-]{0,31}$/
+
+/**
+ * A JEE roll number rather than a college enrollment number.
+ *
+ * Some students are recorded in the roster under their 12-digit JEE roll
+ * number instead of the (24|25|26)(letter)(4 digits) college format. Looking
+ * one up works and pre-fills correctly, but the JEE number is not what this
+ * form should register against, so it is cleared and the student is asked for
+ * their college roll number. Verified against the roster: 54 such records, all
+ * 12 digits, so the threshold sits well clear of the 7-digit college format.
+ */
+const JEE_ROLL_RE = /^\d{10,}$/
 const EMAIL_RE = /^[^\s@,;<>()[\]\\]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/
 const NONE_TOKENS = new Set(['na', 'n/a', 'n.a.', 'na.', 'none', 'nil', 'not available', '-', '--'])
 
@@ -141,6 +161,17 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
   const abortRef = useRef<AbortController | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
+  /**
+   * True once this student's identity has been proven by a JEE-number match.
+   *
+   * `runLookup` is a useCallback with an empty dependency array, so it cannot
+   * read `locked` or `lookupState` without going stale. This ref is the single
+   * source of truth for "already verified", and it is what stops a later failed
+   * re-lookup - for the college roll number she types next, or a network blip -
+   * from releasing details that were already confirmed against the roster.
+   */
+  const jeeVerifiedRef = useRef(false)
+
   const set = useCallback(<K extends keyof StudentDetails>(key: K, value: StudentDetails[K]) => {
     setDetails((previous) => ({ ...previous, [key]: value }))
   }, [])
@@ -158,11 +189,15 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
 
       // Too short to be a real roll number — don't bother the server.
       if (rollNumber.length < 3) {
-        setLookupState('idle')
+        // Stay on the JEE prompt while she clears and retypes the field,
+        // otherwise the guidance disappears mid-edit and reads as a reset.
+        setLookupState(jeeVerifiedRef.current ? 'needsRollNumber' : 'idle')
         return
       }
       if (!ROLL_RE.test(rollNumber)) {
-        setLookupState('notFound')
+        // Rejected before the server is asked, so this is "cannot be a college
+        // roll number" rather than "no such student" - and she is still locked.
+        setLookupState(jeeVerifiedRef.current ? 'rollNumberUnverified' : 'notFound')
         return
       }
 
@@ -175,10 +210,28 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
         if (controller.signal.aborted) return
 
         if (result.found) {
-          setDetails((previous) => ({ ...previous, ...result.student, rollNumber }))
-          setLocked(true)
-          setLookupState('found')
+          // A JEE number is a valid lookup key but not a valid thing to
+          // register against. Keep the verified details, drop the number, and
+          // ask for the college roll number instead.
+          if (JEE_ROLL_RE.test(rollNumber)) {
+            setDetails((previous) => ({ ...previous, ...result.student, rollNumber: '' }))
+            jeeVerifiedRef.current = true
+            setLocked(true)
+            setLookupState('needsRollNumber')
+          } else {
+            setDetails((previous) => ({ ...previous, ...result.student, rollNumber }))
+            jeeVerifiedRef.current = false
+            setLocked(true)
+            setLookupState('found')
+          }
           setErrors({})
+        } else if (jeeVerifiedRef.current) {
+          // Already proven by JEE. Her college roll number simply is not in the
+          // roster - which is the expected case for the students recorded only
+          // under their JEE number. Keep every field locked; she types her
+          // college roll number and continues. Unlocking here would discard
+          // details that were correctly fetched moments earlier.
+          setLookupState('rollNumberUnverified')
         } else {
           setLocked(false)
           setLookupState('notFound')
@@ -187,9 +240,15 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
         // A superseded lookup is not a failure — just a stale request.
         const name = (error as { name?: string } | null)?.name
         if (name === 'AbortError' || controller.signal.aborted) return
-        // Network/server failure must not block manual registration.
-        setLocked(false)
-        setLookupState('failed')
+        // Network/server failure must not block manual registration - unless the
+        // student is already verified, in which case there is nothing to fill in
+        // manually and dropping the lock would only destroy good data.
+        if (jeeVerifiedRef.current) {
+          setLookupState('verifiedOffline')
+        } else {
+          setLocked(false)
+          setLookupState('failed')
+        }
       }
     },
     [],
@@ -258,6 +317,9 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
     idle: { text: t('lookup.idle'), tone: 'text-ink-soft/70' },
     searching: { text: t('lookup.searching'), tone: 'text-ink-soft/80' },
     found: { text: t('lookup.found'), tone: 'text-accent-green' },
+    needsRollNumber: { text: t('lookup.jeeFound'), tone: 'text-accent-green' },
+    rollNumberUnverified: { text: t('lookup.jeeRollUnverified'), tone: 'text-ink-soft/80' },
+    verifiedOffline: { text: t('lookup.jeeOffline'), tone: 'text-ink-soft/80' },
     notFound: { text: t('lookup.notFound'), tone: 'text-ink-soft/80' },
     failed: { text: t('lookup.failed'), tone: 'text-accent-red' },
   }[lookupState]
@@ -279,7 +341,11 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
           error={show('rollNumber')}
           onChange={(e) => {
             set('rollNumber', e.target.value)
-            if (locked) setLocked(false)
+            // Normally typing here releases the lock, so a mistyped number is
+            // recoverable. But in needsRollNumber the lock is what holds the
+            // JEE-verified details in place while they type their college
+            // roll number, so it must survive until the next lookup resolves.
+            if (locked && !jeeVerifiedRef.current) setLocked(false)
           }}
           onBlur={() => void runLookup(details.rollNumber)}
           autoComplete="off"
@@ -307,6 +373,9 @@ export function Step1Details({ onSubmit }: { onSubmit: (details: StudentDetails)
             <button
               type="button"
               onClick={() => {
+                // An explicit opt-out, so this is the one place the lock is
+                // meant to break - even for a JEE-verified student.
+                jeeVerifiedRef.current = false
                 setLocked(false)
                 setLookupState('idle')
               }}
