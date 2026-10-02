@@ -11,7 +11,7 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test \"test/*.test.js\"",
-    "build": "node scripts/seed-roster.js",
+    "seed-roster": "node scripts/seed-roster.js",
     "encode-roster": "node scripts/encode-roster.js"
   },
   "dependencies": {
