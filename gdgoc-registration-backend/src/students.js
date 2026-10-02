@@ -1,6 +1,7 @@
 "use strict";
 
 const fs = require("fs/promises");
+const zlib = require("zlib");
 const { env } = require("../config/env");
 const { stripControlChars, clamp } = require("./security");
 
@@ -64,9 +65,63 @@ function toPublicStudent(raw) {
   };
 }
 
+/**
+ * Decode the same marker-prefixed payload scripts/encode-roster.js writes.
+ * Kept byte-compatible with that script's `decode`, and with seed-roster.js.
+ */
+function decodePayload(payload) {
+  const marker = payload[0];
+  const buf = Buffer.from(payload.slice(1), "base64");
+
+  switch (marker) {
+    case "b":
+      return zlib.brotliDecompressSync(buf);
+    case "z":
+      return zlib.gunzipSync(buf);
+    case "r":
+      return buf;
+    default:
+      throw new Error(
+        `unknown payload marker "${marker}" (expected "b" brotli, "z" gzip or "r" raw)`
+      );
+  }
+}
+
+/**
+ * Roster from STUDENTS_JSON_B64, for hosts with no writable disk.
+ *
+ * WHY THIS EXISTS: `data/students.json` is gitignored, so a deploy has to
+ * supply it somehow. The obvious route is scripts/seed-roster.js writing the
+ * file during the build, and that works on hosts with a real filesystem. It
+ * cannot work on a serverless host - Vercel bundles only the traced source
+ * files, so a file created mid-build is not in the deployment, and the lambda's
+ * filesystem is read-only besides. The result would be a roster that silently
+ * decodes to nothing and a portal where nobody can register.
+ *
+ * So the payload is decoded straight from the environment instead, which needs
+ * no disk at all. Same compressed blob, same marker, same validation.
+ */
+function loadRosterFromEnv() {
+  const payload = (process.env.STUDENTS_JSON_B64 || "").trim();
+  if (!payload) return null;
+  const students = JSON.parse(decodePayload(payload).toString("utf8"));
+  if (!Array.isArray(students) || students.length === 0) {
+    throw new Error("STUDENTS_JSON_B64 did not decode into a non-empty array");
+  }
+  return students;
+}
+
 async function loadRoster() {
-  const raw = await fs.readFile(env.STUDENTS_FILE, "utf8");
-  const parsed = JSON.parse(raw);
+  // Env first: it is the only source that works on a serverless host, and it is
+  // never set in local development, so this cannot shadow the file anyone is
+  // editing.
+  let parsed = loadRosterFromEnv();
+
+  if (!parsed) {
+    const raw = await fs.readFile(env.STUDENTS_FILE, "utf8");
+    parsed = JSON.parse(raw);
+  }
+
   if (!Array.isArray(parsed)) {
     throw new TypeError("students.json must contain a JSON array");
   }
