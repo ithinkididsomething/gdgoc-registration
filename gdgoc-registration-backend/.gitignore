@@ -5,6 +5,11 @@ data/students.json
 data/registrations.json
 # The CSV export holds the same names and phone numbers as the log.
 registrations.csv
+# Derived by scripts/import-google-form.js from a real Google Forms export.
+# needs-enrollment.csv contains real names and Google account addresses.
+data/students.backup.json
+data/needs-enrollment.csv
+data/import-report.json
 data/*.tmp
 
 .env

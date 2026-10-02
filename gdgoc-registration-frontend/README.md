@@ -142,6 +142,7 @@ Everything you might need to do, in one place. Details for each are linked.
 | Get the 19-student test roster back | `node scripts/seed-test-data.js` (backend) |
 | Clear submitted registrations only | `node scripts/seed-test-data.js --reset-only` |
 | Load the real student list | Edit `data/students.json` — [details](#1-update-the-student-roster) |
+| Import an existing Google Form export | `node scripts/import-google-form.js "<export>.json"` — [details](#importing-an-existing-google-form-export) |
 | Use a roster without touching the repo | Set `DATA_DIR` to the folder holding it |
 | Back up registrations | Copy `data/registrations.json` somewhere durable — [why it matters](#going-live) |
 | **Get registrations into a spreadsheet** | `node scripts/export-registrations.js` — [details](#getting-the-registrations-out) |
@@ -276,6 +277,108 @@ A hit returns `{"success":true,"found":true,"student":{...}}`. If the roster is
 malformed the server logs the reason and treats it as **empty** rather than
 crashing, so a syntax error looks exactly like "nobody is registered" — always
 check the `[api]` terminal output first.
+
+---
+
+### Importing an existing Google Form export
+
+If registrations were collected in a **Google Form** before this portal existed,
+you do not need to retype anything. Export the responses as JSON from Google
+Forms (Responses → Link → download) and run the importer:
+
+```bash
+cd gdgoc-registration-backend
+node scripts/import-google-form.js "../path/to/Export.json"
+node scripts/import-google-form.js "../path/to/Export.json" --dry-run   # look, don't write
+```
+
+It prints a reconciliation before writing anything:
+
+```
+  Sheets in the export
+    Sheet1                    738 rows   728 unique  <- used
+    Sheet4                    582 rows   581 unique  (fully contained, skipped)
+    duplicate of sheet 1      104 rows    82 unique  (fully contained, skipped)
+    Drafts                      2 rows     0 unique  (fully contained, skipped)
+
+  Reconciliation
+    non-empty rows in "Sheet1" : 738
+    duplicate submissions removed  : 1
+    rolled up to unique students   : 737
+    roster written                : 720
+    excluded, no usable enrollment: 17
+    drafts excluded (never submitted): 2
+```
+
+#### Why only one sheet is read
+
+A Forms export can contain several sheets, and **merging them all is almost always
+wrong.** The importer uses `Sheet1` alone and verifies the other sheets against
+it on every run:
+
+- **`Sheet4`** — every enrollment number in it also appears in `Sheet1`. It is a
+  stale earlier export. Merging it would create ~582 phantom duplicate students.
+- **`duplicate of sheet 1`** — also entirely inside `Sheet1`. Merging it would
+  create ~104 more.
+- **`Drafts`** — responses the student started but never submitted. Google
+  captures them; they are not registrations.
+
+The "fully contained, skipped" note is computed at runtime, not assumed. If a
+future export has a sheet that *does* add students, the script reports
+`(+N new)` instead, and you can decide what to do about it.
+
+#### How duplicates are decided
+
+Deduplication keys on the **Google account**, not the enrollment number. An
+enrollment number can be mistyped, left blank, or shared by two people; the
+signed-in Google account cannot change between two submissions by the same
+person. Where an account submitted twice, the **earlier** submission is kept.
+
+#### Students it refuses to import
+
+A roster entry is useless without a usable enrollment number, because that is
+what a student types to look themselves up. Anything blank or containing
+characters outside `[A-Za-z0-9-]` is excluded and listed in
+`data/needs-enrollment.csv`:
+
+| What you see | Why |
+|---|---|
+| blank | the field was skipped |
+| `26\|1161` | a `\|` instead of a letter |
+| `25B2137/DE25861` | **two students merged into one cell** |
+
+That last one is worth knowing about: it means two people submitted into the
+same spreadsheet cell. Fix those by hand in `data/needs-enrollment.csv`, then
+add the corrected enrollment numbers to `students.json`.
+
+#### Branch names are remapped
+
+The export uses the sheet's short codes; the form's dropdown uses canonical
+names. These are translated automatically:
+
+| Export | Imported as |
+|---|---|
+| `ETC` | `ENTC` |
+| `EI` | `Electronics and Instrumentation` |
+| `Mech` | `Mechanical Engineering` |
+| `Civil` | `Civil Engineering` |
+
+Matching is case-insensitive, so a lowercase `cs` still becomes `CS`. Anything
+with no mapping (`B.Design`, `Mtech IIPS`, `Mtech SDSF`, `Other`) is passed
+through **and reported**, so you can decide whether to add a real option to
+`src/config/options.ts` rather than have it silently mis-mapped. Those values
+still display in the form — the branch field injects unknown values — but they
+are not selectable from a fresh dropdown.
+
+#### Safety
+
+- The importer **backs up** the current roster to `data/students.backup.json`
+  before overwriting, because `students.json` is git-ignored and therefore not
+  in version control.
+- It writes only `data/students.json`, `data/needs-enrollment.csv` and
+  `data/import-report.json`. All four are git-ignored, so **no real name,
+  email or phone number can be committed**.
+- It never runs `git`. It cannot push anything anywhere.
 
 ---
 
@@ -701,6 +804,7 @@ gdgoc-registration-backend/
     security.js             URL sanitising, throttling, text cleanup
   scripts/
 seed-test-data.js       regenerate the test roster
+import-google-form.js   build the roster from a real Google Forms export
 export-registrations.js turn the submission log into a spreadsheet CSV
 bench-store.js          throughput and duplicate-registration check
   test/api.test.js          30 tests
@@ -871,8 +975,11 @@ npm install --omit=dev
 NODE_ENV=production \
 CORS_ORIGINS=https://your-frontend-domain \
 PORT=3000 \
-node src/server.js
+node server.js
 ```
+
+`server.js` sits at the **backend root**, not in `src/` — `src/` holds only the
+modules it requires. `npm start` does the same thing.
 
 Required in production, or the API refuses to start:
 
