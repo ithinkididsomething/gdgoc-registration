@@ -2,11 +2,13 @@
 
 const express = require("express");
 const cors = require("cors");
+const crypto = require("crypto");
 
 const { env } = require("../config/env");
 const { VERTICAL_FORMS } = require("../config/verticals");
 const { findStudentByRollNumber } = require("./students");
-const { appendRegistration } = require("./registrations");
+const { appendRegistration, readAllRegistrations } = require("./registrations");
+const { toCsv } = require("./registrations-csv");
 const { validateRegistration, ValidationError } = require("./validation");
 const { isSafeObject, createRateLimiter, rateLimit, asyncHandler, clientIp } = require("./security");
 
@@ -80,6 +82,13 @@ function createApp() {
     max: env.RATE_LIMIT_MAX_REGISTER,
     name: "register",
   });
+  // Higher than register: a spreadsheet polling =IMPORTDATA() is legitimate
+  // traffic, and one organiser should not lock themselves out of their sheet.
+  const exportLimiter = createRateLimiter({
+    windowMs: env.RATE_LIMIT_WINDOW_MS,
+    max: env.RATE_LIMIT_MAX_EXPORT,
+    name: "export",
+  });
 
   // --- Health -------------------------------------------------------------
   app.get("/api/health", (_req, res) => {
@@ -141,6 +150,50 @@ function createApp() {
       };
 
       return res.status(201).json({ success: true, forms });
+    })
+  );
+
+  /**
+   * GET /api/registrations.csv?key=<token>
+   *
+   * The registration log as a CSV, for Excel or Google Sheets.
+   *
+   * Disabled entirely unless EXPORT_TOKEN is set - it returns 404, not 401, so
+   * an unconfigured deployment does not even confirm the route exists. The
+   * token travels as a query parameter because that is the only thing
+   * =IMPORTDATA() in a spreadsheet can send; Sheets cannot attach headers.
+   *
+   * The trade-off of a query token is that it lands in proxy and server access
+   * logs. That is acceptable only because this endpoint is opt-in and the
+   * alternative - no export at all - is worse for the organisers.
+   */
+  app.get(
+    "/api/registrations.csv",
+    rateLimit(exportLimiter),
+    asyncHandler(async (req, res) => {
+      if (!env.EXPORT_TOKEN) {
+        // Indistinguishable from any other unknown path.
+        return res.status(404).json({ success: false, error: "Not found" });
+      }
+
+      const provided = String(req.query.key ?? "");
+      const expected = env.EXPORT_TOKEN;
+      const matches =
+        provided.length === expected.length &&
+        crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+
+      if (!matches) {
+        return res.status(401).json({ success: false, error: "Invalid export key" });
+      }
+
+      const records = await readAllRegistrations();
+      const csv = toCsv(records);
+
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="registrations.csv"');
+      // Student data must not sit in a shared cache.
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(200).send(csv);
     })
   );
 

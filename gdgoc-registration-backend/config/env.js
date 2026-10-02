@@ -93,6 +93,19 @@ const env = Object.freeze({
 
   /** Student list cache TTL, so swapping in the real dataset is picked up. */
   STUDENTS_CACHE_TTL_MS: intFromEnv("STUDENTS_CACHE_TTL_MS", 30_000),
+
+  /**
+   * Shared secret that unlocks GET /api/registrations.csv.
+   *
+   * Unset (the default) means the CSV endpoint does not exist - the route
+   * answers 404. This endpoint hands out every student's name, phone number
+   * and email, so it must never be reachable by default. Generate one with:
+   *   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   */
+  EXPORT_TOKEN: (process.env.EXPORT_TOKEN || "").trim(),
+
+  /** Per-IP cap on CSV exports, per window. Generous for Sheets polling. */
+  RATE_LIMIT_MAX_EXPORT: intFromEnv("RATE_LIMIT_MAX_EXPORT", 60),
 });
 
 module.exports = { env };

@@ -31,8 +31,8 @@ function enqueue(task) {
   return run;
 }
 
-function serialiseError(error) {
-  return Object.assign(new Error("Could not persist the registration."), {
+function serialiseError(error, message = "Could not persist the registration.") {
+  return Object.assign(new Error(message), {
     status: 500,
     expose: true,
     cause: error,
@@ -41,7 +41,11 @@ function serialiseError(error) {
 
 async function readAll() {
   const raw = await fs.readFile(env.REGISTRATIONS_FILE, "utf8");
-  const parsed = JSON.parse(raw);
+  // Tolerate a UTF-8 BOM. This file is meant to be hand-editable, and Notepad,
+  // Excel and most Windows tooling will happily add one - which would otherwise
+  // throw here and take down every registration and every export with it. Three
+  // invisible bytes should not be able to stop the form working.
+  const parsed = JSON.parse(raw.replace(/^﻿/, ""));
   if (!Array.isArray(parsed)) {
     throw new TypeError("registrations.json must contain a JSON array");
   }
@@ -112,4 +116,21 @@ function drain() {
   return writeQueue;
 }
 
-module.exports = { appendRegistration, drain };
+/**
+ * Read every stored record. Read-only - used by the CSV export route.
+ *
+ * Returns [] when the log does not exist yet, so a fresh install exports an
+ * empty sheet rather than a 500.
+ */
+async function readAllRegistrations() {
+  try {
+    return await readAll();
+  } catch (error) {
+    if (error.code === "ENOENT") return [];
+    // Distinct message: readAllRegistrations feeds the export route, where
+    // "could not persist the registration" would be actively misleading.
+    throw serialiseError(error, "Could not read the registration log.");
+  }
+}
+
+module.exports = { appendRegistration, readAllRegistrations, drain };

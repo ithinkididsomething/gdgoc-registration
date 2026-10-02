@@ -567,6 +567,65 @@ node scripts/export-registrations.js -           # print to the terminal
 | Google Sheets | Drive → New → File upload → pick the `.csv` |
 | Excel | Data → From Text/CSV → pick the file |
 | LibreOffice | File → Open → pick the file |
+| Excel, straight from the server | See [Live CSV endpoint](#live-csv-endpoint) — no file needed |
+
+### Live CSV endpoint
+
+The script above needs a terminal. If you would rather open a spreadsheet that
+fetches the data itself, the server can serve the same CSV over HTTP:
+
+```
+GET /api/registrations.csv?key=<EXPORT_TOKEN>
+```
+
+It is **off unless you turn it on.** Set `EXPORT_TOKEN` and the route appears;
+leave it unset and it returns `404`, not `401`, so an unconfigured deployment
+does not even confirm the route exists.
+
+```bash
+# Generate a token (32 random bytes)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# Then export it to the server's environment:
+EXPORT_TOKEN=<paste>
+```
+
+**Excel / LibreOffice.** Open the URL and the browser downloads the file
+straight into the right application:
+
+```
+https://your-domain/api/registrations.csv?key=<EXPORT_TOKEN>
+```
+
+**Google Sheets, auto-updating.** This is the reason the token is in the query
+string — a spreadsheet cannot send headers. Put this in a cell:
+
+```
+=IMPORTDATA("https://your-domain/api/registrations.csv?key=<EXPORT_TOKEN>")
+```
+
+`IMPORTDATA` refreshes roughly every 15 minutes. To turn it into a proper table,
+select a cell above the range, paste the formula, then **Data → Split text to
+columns** (or fill down and wrap in `ARRAYFORMULA`/`QUERY`).
+
+Alternatively **File → Import → URL** in Sheets, pasting the same address.
+
+#### Read this before enabling it
+
+This endpoint hands out **every student's name, phone number and email** to
+anyone who has the URL. There is no second factor and no per-user identity.
+
+- Treat the URL like a password. Do not paste it into Slack, a shared doc, or
+  anywhere students can see it.
+- It lands in your proxy and web-server access logs, because query strings do.
+  That is unavoidable for a spreadsheet to fetch it.
+- Rotate by changing `EXPORT_TOKEN` and restarting. Anyone holding the old URL
+  keeps access until you do.
+- Prefer the CLI script when you are at the machine anyway — nothing is exposed
+  over the network that way.
+
+Nothing else changed about access: `/api/lookup` is still unauthenticated, and
+that is the larger exposure. See [Security notes](#security-notes).
 
 ### What the exporter handles
 

@@ -19,47 +19,14 @@
 const fs = require("fs");
 const path = require("path");
 
+// The CSV rendering itself lives in src/registrations-csv.js so this script and
+// GET /api/registrations.csv cannot drift apart.
+const { toCsv } = require("../src/registrations-csv");
+
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : path.resolve(__dirname, "..", "data");
 const REGISTRATIONS_FILE = path.join(DATA_DIR, "registrations.json");
-
-/** Column order. Anything missing from a record becomes an empty cell. */
-const COLUMNS = [
-  "submittedAt",
-  "rollNumber",
-  "fullName",
-  "branch",
-  "section",
-  "yearOfStudy",
-  "contactNumber",
-  "gender",
-  "email",
-  "linkedin",
-  "github",
-  "instagram",
-  "skills",
-  "priority1",
-  "priority2",
-];
-
-/**
- * Quote a value for CSV per RFC 4180.
- *
- * Wrapping in quotes is not enough on its own: a cell containing a double quote
- * has to have that quote doubled, or Sheets truncates the field at the quote.
- * A leading =, +, - or @ is prefixed with a tab as well, because those make
- * spreadsheets treat the cell as a formula - a real risk here, since
- * contactNumber values can contain them.
- */
-function csvCell(value) {
-  if (value === null || value === undefined) return '""';
-  let text = String(value);
-
-  if (/^[=+\-@\t\r]/.test(text)) text = `\t${text}`;
-  if (/[",\n\r]/.test(text)) text = `"${text.replace(/"/g, '""')}"`;
-  return text;
-}
 
 function readRegistrations() {
   if (!fs.existsSync(REGISTRATIONS_FILE)) {
@@ -82,15 +49,6 @@ function readRegistrations() {
     process.exit(1);
   }
   return parsed;
-}
-
-function toCsv(rows) {
-  const lines = [COLUMNS.join(",")];
-  for (const row of rows) {
-    lines.push(COLUMNS.map((column) => csvCell(row?.[column])).join(","));
-  }
-  // Excel is happier with CRLF line endings in a CSV.
-  return `${lines.join("\r\n")}\r\n`;
 }
 
 const args = process.argv.slice(2);
