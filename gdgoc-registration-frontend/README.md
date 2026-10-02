@@ -391,7 +391,7 @@ schemes:
 
 | Shape | Example | Likely cohort |
 |---|---|---|
-| 12 digits | `260310001170` | a student ID rather than an enrollment number |
+| 12 digits | `260310001170` | a **JEE roll number** — see below |
 | 2 letters + 5 digits | `DD25010`, `DE24092` | a `DD`/`DE` prefix scheme |
 | 2 letters + 7 digits | `DE2402288` | same, longer form |
 | `AA-2K26-NN` | `CS-2K26-01` | a batch code — `2K26` reads as 2nd year, 2026 |
@@ -411,6 +411,47 @@ guesses at those; check them by hand and delete them from `students.json`.
 Roll numbers are upper-cased on import. The export mixes `26C1234` and
 `26c1234`; lookup is case-insensitive and there are no case-only collisions, so
 this is purely cosmetic — it just stops the roster looking half-typed.
+
+#### JEE roll numbers
+
+The 54 twelve-digit records are **JEE roll numbers**. A handful of students are
+recorded in the roster under their JEE number instead of their college
+enrollment number, so the number they know by is not the one the form registers
+against.
+
+They can still look themselves up. The form treats a long all-digit number
+(`/^\d{10,}$/`) as a JEE number and, when one resolves, handles it differently:
+
+| Step | What happens |
+|---|---|
+| They type their JEE roll number | Lookup runs and **matches** |
+| | Their details fill in and **lock** — name, branch, section, year, phone, gender, LinkedIn |
+| | The JEE number is **cleared and discarded** |
+| | Banner: *"Found you by your JEE roll number — please enter your college roll number"* |
+| They type their **college** roll number | Stored, and it is the only number recorded |
+| That number is *not* in the roster | Expected. Details **stay locked**; she checks them and continues |
+
+The last row matters: those students are usually listed *only* under their JEE
+number, so their college roll number will normally miss. That is not an error
+and must not release the lock — the details were verified moments earlier.
+Identity is already proven, so a later miss or a dropped connection leaves the
+fields locked and only the message changes.
+
+The one deliberate escape hatch is the **Edit manually** link on the banner,
+which releases the lock for anyone who wants to correct a field.
+
+Two details worth knowing if you touch this code:
+
+- The lock is tracked by a **ref**, not by state. `runLookup` is a `useCallback`
+  with an empty dependency array, so reading state inside it would go stale and
+  the lock would drop on the first re-render.
+- Typing in the roll-number field normally *releases* the lock, so a mistyped
+  number stays recoverable. That behaviour is suppressed while JEE-verified,
+  otherwise the first keystroke would destroy the pre-fill.
+
+The JEE number is **never** stored, submitted, or exported — not in
+`registrations.json`, not in the CSV. The threshold cannot collide with a college
+number: JEE numbers are 12 digits, college enrollment numbers are 7.
 
 #### Branch letters are consistent
 
@@ -753,6 +794,10 @@ A miss returns `200` with `{"success": true, "found": false}` — the same shape
 minus `student`, so response size cannot be used to tell "not in roster" apart
 from anything else.
 
+A 12-digit **JEE roll number** resolves exactly like any other key. The form then
+clears it and asks for the college enrollment number instead — see
+[JEE roll numbers](#jee-roll-numbers). The number is never stored.
+
 ### `POST /api/register`
 
 Required: `rollNumber`, `fullName`, `branch`, `yearOfStudy`, `contactNumber`,
@@ -921,11 +966,14 @@ gdgoc-registration-backend/
     validation.js           every rule the server enforces
     security.js             URL sanitising, throttling, text cleanup
   scripts/
-seed-test-data.js       regenerate the test roster
-import-google-form.js   build the roster from a real Google Forms export
-export-registrations.js turn the submission log into a spreadsheet CSV
-bench-store.js          throughput and duplicate-registration check
-  test/api.test.js          30 tests
+    seed-test-data.js       regenerate the test roster
+    import-google-form.js   build the roster from a real Google Forms export
+    export-registrations.js turn the submission log into a spreadsheet CSV
+    bench-store.js          throughput and duplicate-registration check
+  test/
+    api.test.js             30 tests
+    export-csv.test.js      10 tests
+    export-disabled.test.js  3 tests
 
 gdgoc-registration-frontend/
   src/
@@ -951,7 +999,7 @@ gdgoc-registration-frontend/
 ## Testing and checks
 
 ```bash
-# Backend — 30 tests: validation, security, routes, store
+# Backend - 43 tests: validation, security, routes, store
 cd gdgoc-registration-backend
 npm test
 
@@ -999,9 +1047,16 @@ Then, at `http://localhost:5173`:
 | 10 | Submit, then reload and submit again | Both succeed — the known duplicate gap |
 | 11 | Resize to a phone width | Layout holds, nothing clipped |
 | 12 | Stop the backend, then search | Friendly "can't reach the API" message, not a blank screen |
+| 13 | Type a **JEE roll number** (e.g. `260310838051`) | Details fill in and lock; the number is **cleared**; prompt asks for the college roll number |
+| 14 | Type your college roll number into that field | Details **stay locked** even though it won't match the roster |
+| 15 | Stop the backend during step 14 | Details **stay locked**; message changes to "couldn't reach the server" |
 
 Step 12 is the one people forget to check, and it's the failure students
 actually see when the API is down on the day.
+
+Steps 13–15 cover the JEE path, where the lock has to survive a lookup that
+cannot succeed. There is **no frontend test suite**, so these three are the only
+coverage that path gets — if you touch `Step1Details.tsx`, run them.
 
 If you changed dropdown options, also confirm the new option appears in **both**
 the form and the backend's validation.
