@@ -75,8 +75,44 @@ const REGISTRATION_STORE = (process.env.REGISTRATION_STORE || "firestore").toLow
  * So a project whose database was named anything else - `gdgregs`, `prod`,
  * `registrations` - fails with a bare `NOT_FOUND` and no explanation, which is a
  * genuinely miserable hour to lose. Setting this explicitly removes the trap.
+ *
+ * VALIDATED, because this is the variable most likely to be filled in by
+ * pasting the wrong thing. A credential JSON landed here once, and Firestore
+ * reported it as `INVALID_ARGUMENT: Invalid database id {"type":"service_
+ * account",...}` - technically accurate, practically useless, because it buries
+ * a copy of a private key in an error message. Caught here instead, it says
+ * which variable is wrong and never echoes the value.
  */
-const FIREBASE_DATABASE_ID = process.env.FIREBASE_DATABASE_ID || "(default)";
+function resolveDatabaseId() {
+  const raw = process.env.FIREBASE_DATABASE_ID;
+  if (!raw || !raw.trim()) return "(default)";
+
+  const id = raw.trim();
+
+  // `(default)` is the one name that is not otherwise shaped like an ID.
+  if (id === "(default)") return id;
+
+  // Firestore: 4-63 chars, starts with a letter, lowercase letters/digits/
+  // hyphens, cannot end with a hyphen.
+  const valid = /^[a-z][a-z0-9-]{2,61}[a-z0-9]$/.test(id);
+  if (!valid) {
+    const looksLikeJson = id.startsWith("{") || id.includes("PRIVATE KEY");
+    throw new Error(
+      looksLikeJson
+        ? "FIREBASE_DATABASE_ID looks like a service account key, not a database " +
+          "name. You pasted the key into the wrong variable: the key belongs in " +
+          "FIREBASE_SERVICE_ACCOUNT_JSON, and this variable should be (default) or " +
+          "your database's name."
+        : `FIREBASE_DATABASE_ID ("${id}") is not a valid Firestore database id. ` +
+          "Expected \"(default)\", or 4-63 characters starting with a lowercase " +
+          "letter and containing only lowercase letters, digits and hyphens."
+    );
+  }
+
+  return id;
+}
+
+const FIREBASE_DATABASE_ID = resolveDatabaseId();
 
 const env = Object.freeze({
   NODE_ENV,
