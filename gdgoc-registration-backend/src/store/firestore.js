@@ -57,6 +57,38 @@ function toPlainRecord(documentId, data) {
 let cached = null;
 
 /**
+ * Put a PEM into the exact shape OpenSSL expects, whatever a paste did to it.
+ *
+ * Only two repairs, both of which turn a specific "DECODER routines::
+ * unsupported" into a working credential:
+ *
+ *   1. Literal two-character `\n` sequences become real newlines. This is what
+ *      you get when the JSON is valid but the newlines inside the string were
+ *      escaped rather than encoded, so the PEM arrives as a single line.
+ *   2. `-----BEGINPRIVATEKEY-----` becomes `-----BEGIN PRIVATE KEY-----`, and
+ *      likewise for END. Removing all whitespace to fit an env var takes the
+ *      spaces inside the markers with it, and the markers are load-bearing.
+ *
+ * A key that is already correct passes through untouched.
+ *
+ * @param {unknown} value
+ * @returns {string}
+ */
+function repairPrivateKey(value) {
+  let pem = String(value);
+
+  if (/\\n/.test(pem) && !/\n/.test(pem)) {
+    pem = pem.replace(/\\n/g, "\n");
+  }
+
+  pem = pem
+    .replace(/-----BEGINPRIVATEKEY-----/g, "-----BEGIN PRIVATE KEY-----")
+    .replace(/-----ENDPRIVATEKEY-----/g, "-----END PRIVATE KEY-----");
+
+  return pem.trim();
+}
+
+/**
  * Lazily initialise the Admin SDK and return a Firestore instance.
  *
  * Lazy rather than at require time for the same reason the driver is lazy: a
@@ -134,8 +166,23 @@ function getFirestore() {
           "included, or only part of the file was copied."
       );
     }
+    // The PEM is the fragile part of this whole arrangement, and a mangled one
+    // fails deep inside OpenSSL as "error:1E08010C: DECODER routines::
+    // unsupported", which says nothing about what is actually wrong. Two
+    // specific ways a pasted key arrives broken:
+    //
+    //   - `private_key` still holds the two-character sequence \n rather than a
+    //     real newline, so the whole PEM is one line and the markers are buried.
+    //   - stripping whitespace to force it onto one line also removed the spaces
+    //     inside the markers, giving BEGINPRIVATEKEY instead of
+    //     BEGIN PRIVATE KEY. Both produce that same OpenSSL error.
+    //
+    // Both are repaired here rather than pushed onto whoever is deploying at
+    // midnight, because the fix is unambiguous and reversible.
+    const repaired = repairPrivateKey(parsed.private_key);
+
     // v14 moved `cert` onto the /app subpath; there is no ./credential export.
-    credential = app.cert(parsed);
+    credential = app.cert(Object.assign({}, parsed, { private_key: repaired }));
   }
 
   if (!app.getApps().length) {
