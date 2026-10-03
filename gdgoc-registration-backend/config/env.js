@@ -253,15 +253,7 @@ const env = Object.freeze({
   /** Per-IP cap on CSV exports, per window. Generous for Sheets polling. */
   RATE_LIMIT_MAX_EXPORT: intFromEnv("RATE_LIMIT_MAX_EXPORT", 60),
 
-  /**
-   * How long GET /api/forms/embed-status caches its probe results.
-   *
-   * The endpoint asks Google whether each form still answers 200 with
-   * `embedded=true`, which is the only reliable signal that someone ticked
-   * "Allow anyone to embed" in the form's settings. That setting changes rarely,
-   * so the answer is cached rather than re-fetched on every page view.
-   */
-  EMBED_PROBE_TTL_MS: intFromEnv("EMBED_PROBE_TTL_MS", 10 * 60 * 1000),
+
 });
 
 module.exports = { env };
