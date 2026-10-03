@@ -36,3 +36,6 @@ gcp-key*.json
 # publishes it to the whole web permanently.
 config/verticals.local.js
 config/verticals.local.json
+
+.vercel
+.env*
