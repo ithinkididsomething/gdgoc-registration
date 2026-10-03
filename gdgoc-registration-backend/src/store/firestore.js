@@ -99,12 +99,48 @@ function getFirestore() {
     throw error;
   }
 
-  // No credential object passed: the SDK picks up Application Default
-  // Credentials, which on a managed host means the attached service account and
-  // on a laptop means GOOGLE_APPLICATION_CREDENTIALS pointing at the key file.
+  // Credentials, in order of preference.
+  //
+  // 1. FIREBASE_SERVICE_ACCOUNT_JSON - the key as inline JSON. This is the only
+  //    option on a serverless host, which has no filesystem to point a path at:
+  //    GOOGLE_APPLICATION_CREDENTIALS is a PATH, so pasting JSON into it gives
+  //    "ENOENT ... lstat '/var/task/\"-----BEGIN PRIVATE KEY-----'". The env var
+  //    is named differently on purpose so that mistake fails loudly here instead
+  //    of silently confusing the SDK.
+  // 2. Nothing set - Application Default Credentials, which is a service account
+  //    attached to the host and is the right thing on GCP/Cloud Run.
+  //
   // Never ship a service account key to the browser - the whole point of this
   // driver is that only the server ever talks to Firestore.
-  if (!app.getApps().length) app.initializeApp();
+  const inline = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || "").trim();
+
+  let credential;
+  if (inline) {
+    let parsed;
+    try {
+      parsed = JSON.parse(inline);
+    } catch (error) {
+      throw new Error(
+        "FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON. It must be the entire " +
+          "contents of the service account key file on ONE line - open the file, " +
+          "select all, and paste. " +
+          `Parser said: ${error.message}`
+      );
+    }
+    if (!parsed.private_key || !parsed.client_email) {
+      throw new Error(
+        "FIREBASE_SERVICE_ACCOUNT_JSON is missing private_key or client_email. " +
+          "That usually means the JSON was pasted with its surrounding quotes " +
+          "included, or only part of the file was copied."
+      );
+    }
+    // v14 moved `cert` onto the /app subpath; there is no ./credential export.
+    credential = app.cert(parsed);
+  }
+
+  if (!app.getApps().length) {
+    app.initializeApp(credential ? { credential } : {});
+  }
 
   // The database ID is passed EXPLICITLY even when it is `(default)`. The SDK's
   // bare `getFirestore()` means only `(default)`, and a project whose database
