@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../i18n'
-import { markFormComplete } from '../api/client'
+import { markFormComplete, fetchEmbedStatus } from '../api/client'
 import { VERTICALS } from '../config/verticals'
 import type { AuthorisedForms, StudentDetails } from '../types'
 
@@ -160,6 +160,43 @@ function EmbeddedForm({
   const displayName = known ? known.label : form.name
   const ctaKey = stage === 1 ? 'step3.priority1Cta' : 'step3.priority2Cta'
 
+  /**
+   * Ask the server whether this particular vertical can be embedded at all.
+   *
+   * Embedding is controlled by a checkbox inside each Google Form, and no
+   * Google API exposes it — only the form owner can tick it. So the honest
+   * states are three, not two:
+   *
+   *   undefined - not asked yet; render the iframe and let the watchdog judge
+   *   true      - Google answered 200 with embedded=true; iframe will work
+   *   false     - Google answered 401; the iframe WILL NOT load, so it is not
+   *               rendered at all
+   *
+   * Skipping the frame on a known `false` turns four seconds of staring at a
+   * broken white box into an immediate, deliberate "open in a new tab" screen.
+   * A `true` or `undefined` still renders the iframe, because a working embed is
+   * the better experience whenever one is actually available.
+   *
+   * `undefined` is also what a failed probe leaves behind, which is why an
+   * unreachable backend degrades to today's behaviour instead of hiding a form
+   * that would have loaded fine.
+   */
+  const [embeddable, setEmbeddable] = useState<boolean | undefined>(undefined)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchEmbedStatus(controller.signal).then((status) => {
+      if (controller.signal.aborted) return
+      // Key absent from the map means the server does not know that vertical;
+      // leave it undefined so the iframe still gets its chance.
+      const value = status?.[form.name]
+      setEmbeddable(typeof value === 'boolean' ? value : undefined)
+    })
+    return () => controller.abort()
+  }, [form.name])
+
+  const skipEmbed = embeddable === false
+
   // Watchdog for a slow or refused embed: after 4s, show the fallback rather
   // than an indefinite spinner. Mount-only on purpose — the parent keys this
   // component on the active form and epoch, so a new form or a reopen is a
@@ -246,20 +283,42 @@ function EmbeddedForm({
           </div>
         )}
 
-        <iframe
-          key={embedUrl}
-          ref={frameRef}
-          src={embedUrl}
-          title={`${displayName} — ${t(ctaKey)}`}
-          onLoad={() => setLoaded(true)}
-          className="h-[70vh] min-h-[520px] w-full rounded-[1rem] border-0 bg-white"
-          // Eager, not lazy: this frame is the main content of the step, and a
-          // deferred load can outlast the 4s watchdog above and trip the "did
-          // not load" fallback for a form that was about to arrive fine. A
-          // slightly earlier request is cheaper than a false error message.
-          loading="eager"
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
+        {skipEmbed && (
+          <div
+            className="absolute inset-1.5 z-20 flex flex-col items-center justify-center gap-3 bg-navy px-6 text-center"
+            role="status"
+          >
+            <p className="text-sm font-extrabold text-white">{t('step3.embedOff')}</p>
+            <p className="max-w-sm text-[0.7rem] leading-relaxed text-ink-soft/60">
+              {t('step3.embedOffHint')}
+            </p>
+            <a
+              href={form.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="neu-btn px-5 py-2.5 text-[0.68rem] font-bold tracking-[0.1em] text-ink uppercase"
+            >
+              {t('step3.openInNewTab')}
+            </a>
+          </div>
+        )}
+
+        {!skipEmbed && (
+          <iframe
+            key={embedUrl}
+            ref={frameRef}
+            src={embedUrl}
+            title={`${displayName} — ${t(ctaKey)}`}
+            onLoad={() => setLoaded(true)}
+            className="h-[70vh] min-h-[520px] w-full rounded-[1rem] border-0 bg-white"
+            // Eager, not lazy: this frame is the main content of the step, and a
+            // deferred load can outlast the 4s watchdog above and trip the "did
+            // not load" fallback for a form that was about to arrive fine. A
+            // slightly earlier request is cheaper than a false error message.
+            loading="eager"
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        )}
       </div>
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">

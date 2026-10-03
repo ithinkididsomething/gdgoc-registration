@@ -162,3 +162,31 @@ export function markFormComplete(
     body: JSON.stringify({ stage }),
   }).catch(() => null)
 }
+
+/**
+ * GET /api/forms/embed-status — which verticals can be shown in an iframe.
+ *
+ * Embedding a Google Form depends on a checkbox in the form's own settings that
+ * no API exposes, so the only way to know is to ask Google. The server does that
+ * and returns BOOLEANS ONLY — no URLs, so this response can never become a way
+ * to harvest form links.
+ *
+ * Resolves to `null` when the check cannot be made (backend restarting, offline).
+ * `null` is deliberately not the same as `false`: it means "we do not know", and
+ * the caller should try the iframe and fall back on its own timer rather than
+ * assume the worst. Treating unknown as unembeddable would hide working embeds
+ * whenever the probe hiccuped.
+ */
+export async function fetchEmbedStatus(
+  signal?: AbortSignal,
+): Promise<Record<string, boolean> | null> {
+  try {
+    const body = await request<{ success?: boolean; embeddable?: Record<string, boolean> }>(
+      '/api/forms/embed-status',
+      { signal },
+    )
+    return body?.embeddable ?? null
+  } catch {
+    return null
+  }
+}

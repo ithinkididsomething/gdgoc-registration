@@ -108,6 +108,9 @@ export const en = {
   'step3.embedBlocked': 'The embedded form did not load',
   'step3.embedBlockedHint':
     'Your network or browser may be blocking embedded forms. Open it in a new tab to continue — your answers are not lost.',
+  'step3.embedOff': 'This form opens in a new tab',
+  'step3.embedOffHint':
+    'This form cannot be shown inside the page, so tap below to fill it in. Nothing is lost — it opens in a new tab.',
   'step3.allDone': 'Both forms submitted',
   'step3.allDoneHint':
     'That is everything. You can close this tab — if you need to redo a form, reload the page and sign in again.',
@@ -242,6 +245,9 @@ const hi: Record<TranslationKey, string> = {
   'step3.embedBlocked': 'एम्बेड किया गया फ़ॉर्म लोड नहीं हुआ',
   'step3.embedBlockedHint':
     'आपका नेटवर्क या ब्राउज़र एम्बेडेड फ़ॉर्म को रोक रहा है। जारी रखने के लिए इसे नए टैब में खोलें — आपके उत्तर सुरक्षित हैं।',
+  'step3.embedOff': 'यह फ़ॉर्म नए टैब में खुलेगा',
+  'step3.embedOffHint':
+    'यह फ़ॉर्म पेज के अंदर नहीं दिखाया जा सकता, इसलिए भरने के लिए नीचे दबाएँ। कुछ भी नहीं खोएगा — यह नए टैब में खुलेगा।',
   'step3.allDone': 'दोनों फ़ॉर्म जमा हो गए',
   'step3.allDoneHint':
     'बस इतना ही है। आप यह टैब बंद कर सकते हैं — किसी फ़ॉर्म को दोबारा भरना हो तो पेज रीलोड करके दोबारा साइन इन करें।',

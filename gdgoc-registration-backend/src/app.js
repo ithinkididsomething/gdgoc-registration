@@ -129,6 +129,92 @@ function createApp() {
     res.json({ success: true, service: "gdgoc-registration-backend", env: env.NODE_ENV });
   });
 
+  /* ------------------------------------------------------------------ */
+  /* Embed capability probe                                             */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Does this form still answer 200 when embedded?
+   *
+   * Embedding a Google Form is controlled by a checkbox in the form's own
+   * settings ("Allow anyone to embed"). It is NOT part of the Forms API, so no
+   * code in this repository can switch it on - only the form owner can. When it
+   * is off, Google answers `?embedded=true` with 401 while the plain form still
+   * returns 200, which is exactly how we tell the two states apart.
+   *
+   * WHY THE USER-AGENT HEADER IS NOT OPTIONAL
+   * Google returns 401 to requests that do not look like a browser, regardless of
+   * the embed setting. Probing with a default agent reports every form as
+   * "not embeddable" even after the checkbox is ticked. Verified by testing the
+   * same URLs with and without a browser UA: plain `viewform` returns 200 both
+   * ways, `?embedded=true` returns 401 both ways on this project, and the 401 is
+   * therefore about embedding rather than about bot detection.
+   */
+  async function probeEmbeddable(url) {
+    const target = new URL(url);
+    target.searchParams.set("embedded", "true");
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(target.toString(), {
+        method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+        },
+      });
+      return res.status === 200;
+    } catch {
+      // Timeout, DNS failure, offline: report unknown-as-false so the UI offers
+      // the new-tab path, which always works.
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** Cached per process; Vercel keeps one warm instance so this does its job. */
+  let embedCache = null;
+
+  /**
+   * GET /api/forms/embed-status
+   *
+   * Returns, per vertical, just a BOOLEAN. No URLs - the response is safe to
+   * cache anywhere and cannot become a way to harvest form links, which is the
+   * whole reason the URLs live server-side.
+   *
+   * The frontend uses this to decide whether to render the iframe at all. Left
+   * to a client-side timeout alone, every student whose form has embedding off
+   * stares at a broken frame for four seconds before being offered the new-tab
+   * button. Knowing up front turns that into an immediate, deliberate screen.
+   */
+  app.get(
+    "/api/forms/embed-status",
+    asyncHandler(async (_req, res) => {
+      const now = Date.now();
+      if (!embedCache || now - embedCache.at > env.EMBED_PROBE_TTL_MS) {
+        const keys = Object.keys(VERTICAL_FORMS);
+        const results = await Promise.all(keys.map((k) => probeEmbeddable(VERTICAL_FORMS[k])));
+        embedCache = {
+          at: now,
+          embeddable: Object.fromEntries(keys.map((k, i) => [k, results[i]])),
+        };
+      }
+
+      res.set("Cache-Control", "private, max-age=60");
+      res.json({
+        success: true,
+        embeddable: embedCache.embeddable,
+        checkedAt: new Date(embedCache.at).toISOString(),
+      });
+    })
+  );
+
   /**
    * GET /api/lookup/:rollNumber
    *
