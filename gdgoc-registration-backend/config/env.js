@@ -114,6 +114,89 @@ function resolveDatabaseId() {
 
 const FIREBASE_DATABASE_ID = resolveDatabaseId();
 
+/**
+ * The Google Form URL for each of the 10 verticals, as a JSON object.
+ *
+ * WHY THIS IS AN ENV VAR AND NOT A CONSTANT IN config/verticals.js:
+ *
+ * A form response link is a bearer credential. Anyone holding it can submit to
+ * that form, and it is permanently embedded in this project's git history once
+ * committed - which is exactly what happened: the first version of the vertical
+ * map hardcoded all ten links, and the repository is PUBLIC, so every one of
+ * them was readable by anyone (or any web-enabled AI) the moment it was pushed.
+ * Deleting the file does not fix it, because `git show` still serves the old
+ * blob forever.
+ *
+ * So the URLs now live ONLY in the deployment environment. What stays in the
+ * repo is the list of vertical KEYS, which are just labels and carry no access.
+ *
+ * Accepted shape (all ten keys optional individually, but see verticals.js for
+ * what happens when one is missing):
+ *   VERTICAL_FORM_URLS={"content":"https://docs.google.com/forms/d/e/.../viewform", ...}
+ *
+ * Validation is strict about the host: only Google's own form hosts are allowed,
+ * so a mistyped value fails at startup instead of turning into an iframe that
+ * silently loads somebody else's page.
+ */
+function resolveVerticalFormUrls() {
+  const raw = (process.env.VERTICAL_FORM_URLS || "").trim();
+  const urls = Object.create(null);
+  if (!raw) return Object.freeze(urls);
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    // Deliberately does NOT echo `raw`: a bad paste here is often a paste of
+    // something else entirely, and this message ends up in host logs.
+    throw new Error(
+      "VERTICAL_FORM_URLS is not valid JSON. Expected an object mapping each " +
+        'vertical key to its form URL, e.g. {"content":"https://docs.google.com/' +
+        'forms/d/e/<FORM_ID>/viewform"}. The value was not printed because it may ' +
+        "contain something sensitive."
+    );
+  }
+
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("VERTICAL_FORM_URLS must be a JSON object, not an array or a scalar.");
+  }
+
+  for (const [key, value] of Object.entries(parsed)) {
+    if (typeof value !== "string" || !value.trim()) {
+      throw new Error(`VERTICAL_FORM_URLS["${key}"] must be a non-empty string.`);
+    }
+    const url = value.trim();
+    let host;
+    try {
+      host = new URL(url).hostname.toLowerCase();
+    } catch {
+      throw new Error(
+        `VERTICAL_FORM_URLS["${key}"] is not a valid absolute URL. ` +
+          "Use the full https://docs.google.com/forms/d/e/<FORM_ID>/viewform link."
+      );
+    }
+    if (host !== "docs.google.com" && host !== "forms.google.com") {
+      throw new Error(
+        `VERTICAL_FORM_URLS["${key}"] points at "${host}", which is not a Google ` +
+          "Forms host. Only docs.google.com and forms.google.com are allowed."
+      );
+    }
+    // The frontend appends `embedded=true` itself, so a stored URL must not
+    // hardcode it or the flag would end up baked into a shareable link.
+    if (url.includes("embedded=")) {
+      throw new Error(
+        `VERTICAL_FORM_URLS["${key}"] contains "embedded=". Remove it - the ` +
+          "frontend appends that flag itself at render time."
+      );
+    }
+    urls[key] = url;
+  }
+
+  return Object.freeze(urls);
+}
+
+const VERTICAL_FORM_URLS = resolveVerticalFormUrls();
+
 const env = Object.freeze({
   NODE_ENV,
   IS_PRODUCTION,
@@ -123,6 +206,7 @@ const env = Object.freeze({
 
   REGISTRATION_STORE,
   FIREBASE_DATABASE_ID,
+  VERTICAL_FORM_URLS,
 
   ROOT_DIR,
   DATA_DIR,

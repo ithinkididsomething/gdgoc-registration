@@ -27,3 +27,12 @@ gdgregs-*.json
 *-firebase-adminsdk-*.json
 *service-account*.json
 *service_account*.json
+google-credentials*.json
+gcp-key*.json
+
+# Real Google Form URLs. A form response link is a bearer credential - whoever
+# holds it can submit - so these belong in the deployment env only
+# (VERTICAL_FORM_URLS), never in git. This repo is PUBLIC, so committing one
+# publishes it to the whole web permanently.
+config/verticals.local.js
+config/verticals.local.json
