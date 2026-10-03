@@ -17,7 +17,11 @@
  * happen lazily on first request, which is what makes a cold start tolerable.
  */
 
-const { createApp } = require("./src/app");
+// `../src/app`, not `./src/app` - this file lives in api/, so a leading `./`
+// would look for api/src/app and fail with "Cannot find module". The deployed
+// path is /var/task/gdgoc-registration-backend/api/index.js, so the app is one
+// directory up from here.
+const { createApp } = require("../src/app");
 
 // Built once per warm container. `createApp()` only wires middleware; it does
 // not touch the filesystem or the network.
