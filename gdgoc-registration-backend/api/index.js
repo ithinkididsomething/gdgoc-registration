@@ -17,10 +17,9 @@
  * happen lazily on first request, which is what makes a cold start tolerable.
  */
 
-// `../src/app`, not `./src/app` - this file lives in api/, so a leading `./`
-// would look for api/src/app and fail with "Cannot find module". The deployed
-// path is /var/task/gdgoc-registration-backend/api/index.js, so the app is one
-// directory up from here.
+// This file is api/index.js, so the app is one directory UP. A leading "./"
+// would look for api/src/app and fail with "Cannot find module" - which is
+// exactly what happened the first time.
 const { createApp } = require("../src/app");
 
 // Built once per warm container. `createApp()` only wires middleware; it does
