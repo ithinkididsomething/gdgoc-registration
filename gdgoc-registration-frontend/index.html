@@ -21,16 +21,18 @@
   <body>
     <div id="root"></div>
     <script>
-      // Applies the stored/system theme before first paint. Without this, users
-      // with a dark OS get a white flash on every page load, because React has
-      // not mounted yet and cannot have set the class.
+      // Applies the stored theme before first paint. Without this, a returning
+      // student who chose dark gets a white flash on every page load, because
+      // React has not mounted yet and cannot have set the class.
+      //
+      // Defaults to LIGHT and never consults prefers-color-scheme. This must agree
+      // with readStoredPreference() in src/theme/ThemeProvider.tsx - if the two
+      // disagree, the page paints one theme and then React switches to the other,
+      // which is the flash this whole block exists to prevent.
       ;(function () {
         try {
           var stored = localStorage.getItem('gdgoc.theme')
-          var dark =
-            stored === 'dark' ||
-            ((stored === null || stored === 'system') &&
-              window.matchMedia('(prefers-color-scheme: dark)').matches)
+          var dark = stored === 'dark'
           if (dark) document.documentElement.classList.add('dark')
           document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
         } catch (e) {

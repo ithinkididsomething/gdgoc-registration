@@ -20,11 +20,22 @@ const DARK_QUERY = '(prefers-color-scheme: dark)'
 function readStoredPreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored === 'light' || stored === 'dark' || stored === 'system') return stored
+    if (stored === 'dark') return 'dark'
+    // `system` is deliberately NOT honoured. It was the old default, so anyone
+    // who visited before this change still has it stored, and on a dark-mode
+    // machine it would resolve to dark - which is exactly the behaviour being
+    // removed. Reading it as light makes the new default apply to them too,
+    // without needing to write to their storage.
+    if (stored === 'light' || stored === 'system') return 'light'
   } catch {
     // Storage blocked (private mode) — fall through to the default.
   }
-  return 'system'
+  // Light, not `system`. A portal is read on whatever machine is to hand —
+  // college labs, shared desktops, a phone at night — and following the OS meant
+  // a dark-mode machine got a dark form nobody had art-directed. `light` is the
+  // deliberate default; a student who prefers dark can still choose it and it
+  // sticks.
+  return 'light'
 }
 
 function systemTheme(): ResolvedTheme {
@@ -66,8 +77,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Light/dark only. The third state, `system`, is unreachable on purpose: it is
+  // the one that reintroduced dark mode on a dark OS, and nothing in the app
+  // needs it now that the default is explicit.
   const cycle = useCallback(() => {
-    setPreference(preference === 'light' ? 'dark' : preference === 'dark' ? 'system' : 'light')
+    setPreference(preference === 'dark' ? 'light' : 'dark')
   }, [preference, setPreference])
 
   const value = useMemo(

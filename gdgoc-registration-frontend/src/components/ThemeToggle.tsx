@@ -1,8 +1,10 @@
 import { useTheme, type ResolvedTheme } from '../theme'
 
 /**
- * Three-state theme control: light, dark, or follow the system.
- * Rendered as a neumorphic inset pill matching the language toggle.
+ * Two-state theme control: light or dark. Rendered as a neumorphic inset pill
+ * matching the language toggle.
+ *
+ * The app opens in light for everyone; this is how a student opts into dark.
  */
 
 const OPTIONS: { value: ResolvedTheme; icon: React.ReactNode; label: string }[] = [
