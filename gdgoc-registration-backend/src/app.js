@@ -220,12 +220,19 @@ function createApp() {
       // Throws 409 if this roll number is already in the log.
       await getStore().appendRegistration({ ...record, priority1, priority2 });
 
-      // Explicitly pick the two chosen keys. Nothing iterates over
+      // Explicitly pick the chosen keys. Nothing iterates over
       // VERTICAL_FORMS, so no other vertical's URL can appear here.
+      //
+      // priority2 is OMITTED rather than sent with an undefined url when the
+      // student declined a second vertical. A key present-but-empty would be the
+      // worse option: the client would render an iframe with no src and the
+      // export would imply a form exists.
       const forms = {
         priority1: { name: priority1, url: VERTICAL_FORMS[priority1] },
-        priority2: { name: priority2, url: VERTICAL_FORMS[priority2] },
       };
+      if (VERTICAL_FORMS[priority2]) {
+        forms.priority2 = { name: priority2, url: VERTICAL_FORMS[priority2] };
+      }
 
       return res.status(201).json({ success: true, forms });
     })

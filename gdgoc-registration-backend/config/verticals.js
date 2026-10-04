@@ -200,4 +200,29 @@ function normaliseVertical(value) {
   return VERTICAL_LOOKUP[candidate] === true ? candidate : null;
 }
 
-module.exports = { VERTICAL_FORMS, VERTICAL_KEYS, VERTICAL_LOOKUP, normaliseVertical };
+/**
+ * The stored value for "I do not want a second vertical".
+ *
+ * NOT a vertical key, so it can never collide with one and can never resolve to a
+ * form URL - `normaliseVertical` rejects it and `VERTICAL_FORMS["None"]` is
+ * undefined by construction rather than by a check someone has to remember.
+ *
+ * The literal text is what lands in the `priority2` column of the CSV export, so
+ * it is deliberately explicit rather than an empty cell: an organiser reading
+ * the sheet sees why there is no second preference without needing a legend.
+ */
+const NO_SECOND_PRIORITY = "None";
+
+/** True for the stored "None" marker, case-insensitively. */
+function isNoSecondPriority(value) {
+  return typeof value === "string" && value.trim().toLowerCase() === NO_SECOND_PRIORITY.toLowerCase();
+}
+
+module.exports = {
+  VERTICAL_FORMS,
+  VERTICAL_KEYS,
+  VERTICAL_LOOKUP,
+  NO_SECOND_PRIORITY,
+  isNoSecondPriority,
+  normaliseVertical,
+};

@@ -41,6 +41,7 @@ const {
 } = require("./contract");
 
 const { env } = require("../../config/env");
+const { isNoSecondPriority } = require("../../config/verticals");
 
 /** Single collection. A second one would mean a second thing to back up. */
 const COLLECTION = "registrations";
@@ -280,7 +281,13 @@ async function markFormCompleted(rollNumber, stage) {
       const updated = Object.assign({}, previous, {
         [field]: previous[field] || now,
       });
-      if (updated.priority1CompletedAt && updated.priority2CompletedAt && !updated.formsCompletedAt) {
+      // A student who declined a second vertical has nothing left to submit, so
+      // Priority 1 completing IS completing the application. Without this they
+      // would sit at formsCompletedAt = null forever - indistinguishable from
+      // someone who abandoned the form halfway - because the old rule demanded
+      // both timestamps.
+      const secondDone = updated.priority2CompletedAt || isNoSecondPriority(updated.priority2);
+      if (updated.priority1CompletedAt && secondDone && !updated.formsCompletedAt) {
         updated.formsCompletedAt = now;
       }
 

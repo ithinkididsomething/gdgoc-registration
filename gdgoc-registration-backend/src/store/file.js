@@ -3,6 +3,7 @@
 const fs = require("fs/promises");
 const path = require("path");
 const { env } = require("../../config/env");
+const { isNoSecondPriority } = require("../../config/verticals");
 const {
   rollKey,
   alreadyRegisteredError,
@@ -205,7 +206,8 @@ function markFormCompleted(rollNumber, stage) {
     const updated = Object.assign({}, previous, {
       [field]: previous[field] || now,
     });
-    if (updated.priority1CompletedAt && updated.priority2CompletedAt && !updated.formsCompletedAt) {
+    const secondDone = updated.priority2CompletedAt || isNoSecondPriority(updated.priority2);
+    if (updated.priority1CompletedAt && secondDone && !updated.formsCompletedAt) {
       updated.formsCompletedAt = now;
     }
 

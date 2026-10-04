@@ -1,6 +1,6 @@
 "use strict";
 
-const { normaliseVertical, VERTICAL_KEYS } = require("../config/verticals");
+const { normaliseVertical, VERTICAL_KEYS, NO_SECOND_PRIORITY, isNoSecondPriority } = require("../config/verticals");
 const { collapseWhitespace, stripControlChars, clamp, safeHttpUrl } = require("./security");
 
 /**
@@ -226,14 +226,21 @@ function validateRegistration(body) {
   // "toString" or "__proto__" return null and are rejected — they can never
   // reach VERTICAL_FORMS and resolve to an inherited function.
   const priority1 = normaliseVertical(src.priority1);
-  const priority2 = normaliseVertical(src.priority2);
+  // "None" is accepted for the SECOND slot only. Priority 1 is the whole
+  // application - a student with no first preference has nothing to allocate -
+  // so it is still validated as a real vertical.
+  const priority2Raw = typeof src.priority2 === "string" ? src.priority2.trim() : "";
+  const priority2None = isNoSecondPriority(priority2Raw);
+  const priority2 = priority2None ? NO_SECOND_PRIORITY : normaliseVertical(src.priority2);
 
   if (!priority1) {
     errors.priority1 = `priority1 must be one of: ${VERTICAL_KEYS.join(", ")}`;
   }
   if (!priority2) {
-    errors.priority2 = `priority2 must be one of: ${VERTICAL_KEYS.join(", ")}`;
+    errors.priority2 = `priority2 must be one of: ${VERTICAL_KEYS.join(", ")}, or "${NO_SECOND_PRIORITY}"`;
   }
+  // Only meaningful when a real second vertical was chosen; "None" can never
+  // collide with Priority 1.
   if (priority1 && priority2 && priority1 === priority2) {
     errors.priority2 = "priority2 must be different from priority1";
   }
