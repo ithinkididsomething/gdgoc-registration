@@ -3,27 +3,36 @@ import { Spinner } from '../components/Spinner'
 import { useLanguage } from '../i18n'
 import { VERTICALS } from '../config/verticals'
 import type { StudentDetails, VerticalKey } from '../types'
+import { NO_SECOND_PRIORITY } from '../types'
 
 /**
- * Step 2 — pick two distinct verticals, then submit the whole application.
+ * Step 2 — pick up to two distinct verticals, then submit the application.
  *
  * Collision prevention: the vertical chosen as Priority 1 is disabled in the
  * Priority 2 list, and vice versa. If a change would create a duplicate (which
  * can happen when editing back and forth), the other slot is cleared rather
  * than silently submitting an invalid pair.
+ *
+ * "None" on the second slot is an opt-OUT, not a preference: it says the student
+ * wants only one vertical. It is offered above the verticals so it reads as the
+ * "no second choice" answer rather than as an eleventh team. Priority 1 has no
+ * such option - a student who wants no vertical at all has nothing to allocate.
  */
+
+/** The second slot's sentinel, or a real vertical. */
+type SecondChoice = VerticalKey | typeof NO_SECOND_PRIORITY
 
 interface Step2Props {
   details: StudentDetails
   submitting: boolean
   onBack: () => void
-  onConfirm: (priority1: VerticalKey, priority2: VerticalKey) => void
+  onConfirm: (priority1: VerticalKey, priority2: SecondChoice) => void
 }
 
 export function Step2Priorities({ details, submitting, onBack, onConfirm }: Step2Props) {
   const { t, language } = useLanguage()
   const [priority1, setPriority1] = useState<VerticalKey | ''>('')
-  const [priority2, setPriority2] = useState<VerticalKey | ''>('')
+  const [priority2, setPriority2] = useState<SecondChoice | ''>('')
   const [error, setError] = useState<string | null>(null)
 
   const labelFor = (key: VerticalKey) => {
@@ -36,7 +45,8 @@ export function Step2Priorities({ details, submitting, onBack, onConfirm }: Step
     event.preventDefault()
     if (!priority1) return setError(t('error.priority'))
     if (!priority2) return setError(t('error.priority'))
-    if (priority1 === priority2) return setError(t('error.distinct'))
+    // "None" is not a vertical, so it cannot collide with Priority 1.
+    if (priority2 !== NO_SECOND_PRIORITY && priority1 === priority2) return setError(t('error.distinct'))
     setError(null)
     onConfirm(priority1, priority2)
   }
@@ -49,9 +59,9 @@ export function Step2Priorities({ details, submitting, onBack, onConfirm }: Step
   }
 
   // And symmetrically for Priority 2.
-  function choosePriority2(key: VerticalKey) {
+  function choosePriority2(key: SecondChoice) {
     setPriority2(key)
-    if (key && key === priority1) setPriority1('')
+    if (key && key !== NO_SECOND_PRIORITY && key === priority1) setPriority1('')
     setError(null)
   }
 
@@ -108,7 +118,7 @@ export function Step2Priorities({ details, submitting, onBack, onConfirm }: Step
                     onChange={(e) =>
                       slot === 'priority1'
                         ? choosePriority1(e.target.value as VerticalKey)
-                        : choosePriority2(e.target.value as VerticalKey)
+                        : choosePriority2(e.target.value as SecondChoice)
                     }
                     className={`neu-inset w-full appearance-none rounded-full py-3 pr-12 pl-5 text-sm font-medium text-ink focus:outline-none ${
                       value ? '' : 'text-ink-soft/45'
@@ -117,6 +127,11 @@ export function Step2Priorities({ details, submitting, onBack, onConfirm }: Step
                     <option value="">
                       {slot === 'priority1' ? t('step2.priority1Ph') : t('step2.priority2Ph')}
                     </option>
+                    {/* Above the verticals, and only for the second slot: this is the
+                        "I want just one team" answer, not an eleventh team. */}
+                    {slot === 'priority2' ? (
+                      <option value={NO_SECOND_PRIORITY}>{t('step2.priority2None')}</option>
+                    ) : null}
                     {VERTICALS.map((vertical) => {
                       const disabled = takenByOther !== '' && vertical.key === takenByOther
                       return (
@@ -143,10 +158,15 @@ export function Step2Priorities({ details, submitting, onBack, onConfirm }: Step
                   </svg>
                 </div>
 
-                {/* Blurb of the current selection, so students can sanity-check. */}
-                {value ? (
+                {/* Blurb of the current selection, so students can sanity-check. None has no
+                    blurb - there is no team to describe. */}
+                {value && value !== NO_SECOND_PRIORITY ? (
                   <p className="mt-1.5 px-4 text-[0.68rem] text-ink-soft/65">
                     {VERTICALS.find((v) => v.key === value)?.blurb}
+                  </p>
+                ) : value === NO_SECOND_PRIORITY ? (
+                  <p className="mt-1.5 px-4 text-[0.68rem] text-ink-soft/65">
+                    {t('step2.priority2NoneHint')}
                   </p>
                 ) : null}
               </div>

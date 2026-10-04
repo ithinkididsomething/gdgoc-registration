@@ -13,6 +13,7 @@ import type {
   StudentDetails,
   Step,
   VerticalKey,
+  NO_SECOND_PRIORITY,
 } from './types'
 
 const EMPTY_DETAILS: StudentDetails = {
@@ -65,7 +66,7 @@ export default function App() {
     setNoted({ rollNumber, registration })
   }, [])
 
-  async function handleConfirm(priority1: VerticalKey, priority2: VerticalKey) {
+  async function handleConfirm(priority1: VerticalKey, priority2: VerticalKey | typeof NO_SECOND_PRIORITY) {
     setSubmitting(true)
     setError(null)
     try {

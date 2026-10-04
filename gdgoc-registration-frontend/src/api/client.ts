@@ -4,6 +4,7 @@ import type {
   RegisterResult,
   StudentDetails,
   VerticalKey,
+  NO_SECOND_PRIORITY,
 } from '../types'
 
 /**
@@ -128,11 +129,11 @@ export async function lookupRollNumber(
   return request<LookupResult>(`/api/lookup/${encoded}`, { signal })
 }
 
-/** POST /api/register — returns ONLY the two authorised form links. */
+/** POST /api/register — returns ONLY the chosen form links (one, if priority2 is "none"). */
 export function register(
   details: StudentDetails,
   priority1: VerticalKey,
-  priority2: VerticalKey,
+  priority2: VerticalKey | typeof NO_SECOND_PRIORITY,
 ): Promise<RegisterResult> {
   return request<RegisterResult>('/api/register', {
     method: 'POST',

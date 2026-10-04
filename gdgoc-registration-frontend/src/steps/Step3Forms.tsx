@@ -61,13 +61,17 @@ function toEmbedUrl(url: string): string {
   }
 }
 
-/** Small step indicator: two pips plus a label for whichever is active. */
-function StageRail({ stage }: { stage: Stage }) {
+/** Small step indicator: pips plus a label for whichever is active. */
+function StageRail({ stage, single }: { stage: Stage; single: boolean }) {
   const { t } = useLanguage()
-  const steps: { id: 1 | 2; label: string }[] = [
-    { id: 1, label: t('step3.priority1Cta') },
-    { id: 2, label: t('step3.priority2Cta') },
-  ]
+  // One pip, not two, when the student declined a second vertical. Showing an
+  // empty second stage would imply there was something they skipped.
+  const steps: { id: 1 | 2; label: string }[] = single
+    ? [{ id: 1, label: t('step3.priority1Cta') }]
+    : [
+        { id: 1, label: t('step3.priority1Cta') },
+        { id: 2, label: t('step3.priority2Cta') },
+      ]
 
   return (
     <ol className="mb-7 flex items-center justify-center gap-3" aria-label={t('step3.progress')}>
@@ -305,7 +309,7 @@ function EmbeddedForm({
 }
 
 /** Closing panel once both forms are done. */
-function DonePanel({ details }: { details: StudentDetails }) {
+function DonePanel({ details, single }: { details: StudentDetails; single: boolean }) {
   const { t } = useLanguage()
 
   return (
@@ -325,9 +329,11 @@ function DonePanel({ details }: { details: StudentDetails }) {
             />
           </svg>
         </span>
-        <p className="text-lg font-extrabold text-white">{t('step3.allDone')}</p>
+        <p className="text-lg font-extrabold text-white">
+          {single ? t('step3.allDoneSingle') : t('step3.allDone')}
+        </p>
         <p className="mt-2 text-[0.7rem] leading-relaxed text-ink-soft/60">
-          {t('step3.allDoneHint')}
+          {single ? t('step3.allDoneSingleHint') : t('step3.allDoneHint')}
         </p>
         <p className="mt-4 text-[0.7rem] text-ink-soft/50">
           {details.fullName} · {details.rollNumber}
@@ -344,6 +350,9 @@ export function Step3Forms({ details, forms }: Step3Props) {
   // form document instead of showing a stale already-loaded frame.
   const [epoch, setEpoch] = useState(0)
 
+  // Absent priority2 is the server telling us the student declined a second
+  // vertical, so there is exactly one form and no second stage to walk.
+  const single = !forms.priority2
   const active = stage === 1 ? forms.priority1 : forms.priority2
 
   /**
@@ -361,10 +370,11 @@ export function Step3Forms({ details, forms }: Step3Props) {
    * retried from the "response noted" screen if it failed.
    */
   function advance() {
-    if (stage === 1 || stage === 2) {
-      void markFormComplete(details.rollNumber, stage)
-    }
-    setStage((s) => (s === 1 ? 2 : 3))
+    // Stage 1 either way. With a single form there is no stage 2 to record, and
+    // posting one would fail for a vertical the student never chose.
+    void markFormComplete(details.rollNumber, stage === 1 ? 1 : 2)
+    // Straight to the closing panel when there is no second form.
+    setStage((s) => (s === 1 ? (single ? 3 : 2) : 3))
   }
 
   return (
@@ -391,10 +401,13 @@ export function Step3Forms({ details, forms }: Step3Props) {
         </p>
       </div>
 
-      <StageRail stage={stage} />
+      <StageRail stage={stage} single={single} />
 
-      {stage === 3 ? (
-        <DonePanel details={details} />
+      {/* `!active` cannot happen once `single` is honoured - stage 2 is never
+          reached - but falling through to the closing panel beats handing an
+          iframe an undefined form if that ever changes. */}
+      {stage === 3 || !active ? (
+        <DonePanel details={details} single={single} />
       ) : (
         <EmbeddedForm
           key={`${active.name}-${epoch}`}

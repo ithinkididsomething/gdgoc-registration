@@ -80,8 +80,21 @@ export type LookupResult =
 /** The two form links the server authorises for this student. */
 export interface AuthorisedForms {
   priority1: { name: string; url: string }
-  priority2: { name: string; url: string }
+  /**
+   * Omitted entirely when the student declined a second vertical.
+   *
+   * Absent, not present-but-empty: an empty entry would render an iframe with
+   * no src and imply a second form exists in the export.
+   */
+  priority2?: { name: string; url: string }
 }
+
+/**
+ * The second-priority sentinel, mirroring the server's NO_SECOND_PRIORITY.
+ * Must stay byte-identical to config/verticals.js on the backend - it is the
+ * value written to the `priority2` column of the CSV export.
+ */
+export const NO_SECOND_PRIORITY = 'None' as const
 
 export type RegisterResult = { success: true; forms: AuthorisedForms }
 
