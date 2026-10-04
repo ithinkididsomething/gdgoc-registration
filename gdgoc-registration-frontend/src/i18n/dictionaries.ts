@@ -44,6 +44,7 @@ export const en = {
   'fields.section': 'Section',
   'fields.sectionPh': 'Select section',
   'fields.sectionFixed': 'This branch runs a single section',
+  'fields.sectionMissing': 'Not recorded on your form - please select your section',
   'fields.yearOfStudy': 'Year of Study',
   'fields.contactNumber': 'Contact Number (with +91)',
   'fields.contactNumberPh': '+91 9876543210',
@@ -78,6 +79,7 @@ export const en = {
   'lookup.notFound': 'No record found. Please fill the form manually.',
   'lookup.failed': 'Could not reach the server. You can fill the form manually.',
   'lookup.clear': 'Edit manually',
+  'lookup.clearHint': '(if any information is wrong)',
 
   'action.submit': 'SUBMIT GDG FRESHER\'S RECRUITMENT REGISTRATION FORM',
   'action.confirm': 'CONFIRM SELECTION & PROCEED TO ASSIGNMENTS',
@@ -91,6 +93,8 @@ export const en = {
   'step2.priority2': 'Priority 2 (Required)',
   'step2.priority1Ph': 'Select your first preference',
   'step2.priority2Ph': 'Select your second preference',
+  'step2.priority2None': 'None — I only want one team',
+  'step2.priority2NoneHint': 'You will be given one form instead of two.',
   'step2.collision': 'Already chosen as Priority 1 — pick a different domain.',
   'step2.summary': 'APPLICANT SUMMARY',
   'step2.noSelection': 'Not selected',
@@ -114,6 +118,9 @@ export const en = {
   'step3.allDone': 'Both forms submitted',
   'step3.allDoneHint':
     'That is everything. You can close this tab — if you need to redo a form, reload the page and sign in again.',
+  'step3.allDoneSingle': 'Form submitted',
+  'step3.allDoneSingleHint':
+    'That is everything — you chose a single team, so there is no second form. You can close this tab.',
   'step3.securityNote':
     'These forms were issued specifically for your registration. Please do not share them.',
 
@@ -181,6 +188,7 @@ const hi: Record<TranslationKey, string> = {
   'fields.section': 'सेक्शन',
   'fields.sectionPh': 'सेक्शन चुनें',
   'fields.sectionFixed': 'इस ब्रांच में केवल एक सेक्शन है',
+  'fields.sectionMissing': 'आपके फ़ॉर्म में दर्ज नहीं है - कृपया अपना सेक्शन चुनें',
   'fields.yearOfStudy': 'वर्ष',
   'fields.contactNumber': 'संपर्क नंबर (+91 के साथ)',
   'fields.contactNumberPh': '+91 9876543210',
@@ -215,6 +223,7 @@ const hi: Record<TranslationKey, string> = {
   'lookup.notFound': 'कोई रिकॉर्ड नहीं मिला। कृपया फ़ॉर्म स्वयं भरें।',
   'lookup.failed': 'सर्वर से संपर्क नहीं हो सका। आप फ़ॉर्म स्वयं भर सकते हैं।',
   'lookup.clear': 'स्वयं संपादित करें',
+  'lookup.clearHint': '(यदि कोई जानकारी ग़लत है)',
 
   'action.submit': 'जीडीजी फ्रेशर रिक्रूटमेंट पंजीकरण फ़ॉर्म जमा करें',
   'action.confirm': 'चयन की पुष्टि करें और असाइनमेंट पर जाएं',
@@ -228,6 +237,8 @@ const hi: Record<TranslationKey, string> = {
   'step2.priority2': 'प्राथमिकता 2 (आवश्यक)',
   'step2.priority1Ph': 'अपनी पहली पसंद चुनें',
   'step2.priority2Ph': 'अपनी दूसरी पसंद चुनें',
+  'step2.priority2None': 'कोई नहीं — मुझे केवल एक टीम चाहिए',
+  'step2.priority2NoneHint': 'आपको दो के बजाय एक फ़ॉर्म दिया जाएगा।',
   'step2.collision': 'प्राथमिकता 1 के रूप में चुना गया — कोई दूसरा डोमेन चुनें।',
   'step2.summary': 'आवेदक सारांश',
   'step2.noSelection': 'चयनित नहीं',
@@ -251,6 +262,9 @@ const hi: Record<TranslationKey, string> = {
   'step3.allDone': 'दोनों फ़ॉर्म जमा हो गए',
   'step3.allDoneHint':
     'बस इतना ही है। आप यह टैब बंद कर सकते हैं — किसी फ़ॉर्म को दोबारा भरना हो तो पेज रीलोड करके दोबारा साइन इन करें।',
+  'step3.allDoneSingle': 'फ़ॉर्म जमा हो गया',
+  'step3.allDoneSingleHint':
+    'बस इतना ही है — आपने एक ही टीम चुनी है, इसलिए कोई दूसरा फ़ॉर्म नहीं है। आप यह टैब बंद कर सकते हैं।',
   'step3.securityNote': 'ये फ़ॉर्म आपके पंजीकरण के लिए विशेष रूप से जारी किए गए हैं। कृपया इन्हें साझा न करें।',
 
   'noted.title': 'आपकी प्रतिक्रिया दर्ज हो गई है',

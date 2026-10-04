@@ -83,6 +83,24 @@ function localNumber(value: string): string {
 const isNoneToken = (value: string) => NONE_TOKENS.has(value.toLowerCase().replace(/\s+/g, ' ').trim())
 
 /**
+ * Never lock a field the server did not fill in.
+ *
+ * A locked field is inert, so a required field that arrives from the roster
+ * EMPTY and gets locked is a validation error the student cannot clear by any
+ * means inside the form - the only escape is hunting for the "Edit manually"
+ * link, which unlocks their whole verified identity to fix one dropdown. Every
+ * blank in the roster produces one of these, so the fix is conditional rather
+ * than a hardcoded list of the affected roll numbers: if there is no value to
+ * protect, there is nothing to lock.
+ *
+ * This also keeps holding if the roster is corrected, if a new blank appears,
+ * or if a future field is added - the rule cannot be forgotten per-field,
+ * because every locked field goes through here.
+ */
+const lockIfFilled = (locked: boolean, value: string): boolean =>
+  locked && Boolean(value.trim())
+
+/**
  * Guarantee the current value is selectable.
  *
  * The roster stores free-text values ("Information Technology") while the form
@@ -189,6 +207,20 @@ export function Step1Details({
   const jeeVerifiedRef = useRef(false)
 
   /**
+   * True once she has explicitly chosen "Edit manually".
+   *
+   * Clearing `locked` is not sufficient on its own. The debounced-lookup effect
+   * keys off `locked`, so unlocking immediately re-arms it; 500ms later it
+   * re-requested the roll number still sitting in the field, received the same
+   * roster hit, and re-locked everything. The click looked like it did nothing.
+   *
+   * This flag suspends automatic lookups until she edits the roll number herself
+   * (see the field's onChange), which is the only event that should be able to
+   * put the form back under autofill control.
+   */
+  const manualOptOutRef = useRef(false)
+
+  /**
    * The parent's "already responded" handler, kept in a ref for the same reason
    * as `jeeVerifiedRef`: `runLookup` has an empty dependency array on purpose,
    * so reading the prop directly would capture whatever the first render passed
@@ -210,6 +242,11 @@ export function Step1Details({
    */
   const runLookup = useCallback(
     async (raw: string) => {
+      // Honoured before anything else, so neither the debounce nor the field's
+      // onBlur can re-lock a form she has opted out of. Cleared only by editing
+      // the roll number.
+      if (manualOptOutRef.current) return
+
       const rollNumber = raw.trim()
 
       abortRef.current?.abort()
@@ -234,7 +271,13 @@ export function Step1Details({
 
       try {
         const result = await lookupRollNumber(rollNumber, controller.signal)
-        if (controller.signal.aborted) return
+        // Checked after the await as well as before it. Clicking "Edit manually"
+        // blurs the roll-number field, and that blur fires onBlur -> runLookup
+        // BEFORE the click handler runs, so a lookup is already in flight by the
+        // time the opt-out is recorded. The pre-await guard cannot catch that,
+        // and the late response would re-lock every field - which is why a
+        // single click appeared to do nothing and a second one worked.
+        if (controller.signal.aborted || manualOptOutRef.current) return
 
         if (result.found) {
           // Already responded. Stop here rather than pre-filling a form the
@@ -411,6 +454,10 @@ onChange={(e) => {
                 // A controlled input means the caret and any IME mid-word are
                 // unaffected - there is no DOM value to fight with.
                 set('rollNumber', e.target.value.toUpperCase())
+            // Typing a different roll number is an explicit request to look it
+            // up, so it lifts the "Edit manually" opt-out. Otherwise the escape
+            // hatch would be permanent and the field could never re-verify.
+            manualOptOutRef.current = false
             // Normally typing here releases the lock, so a mistyped number is
             // recoverable. But in needsRollNumber the lock is what holds the
             // JEE-verified details in place while they type their college
@@ -439,21 +486,35 @@ onChange={(e) => {
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-navy/50" aria-hidden="true" />
           ) : null}
           {banner.text}
-          {locked ? (
-            <button
-              type="button"
-              onClick={() => {
-                // An explicit opt-out, so this is the one place the lock is
-                // meant to break - even for a JEE-verified student.
-                jeeVerifiedRef.current = false
-                setLocked(false)
-                setLookupState('idle')
-              }}
-              className="font-extrabold text-ink underline underline-offset-2 hover:text-ink-soft"
-            >
-              {t('lookup.clear')}
-            </button>
-          ) : null}
+          {/* The manual-entry escape hatch: small inline text on the status line,
+           * rendered unconditionally so it is reachable from any state.
+           *
+           * `manualOptOutRef` is what makes it actually WORK. Unlocking alone was
+           * not enough - `locked` flipping to false re-arms the debounced lookup
+           * effect below, which 500ms later re-requested the SAME roll number,
+           * got the same roster hit, and re-locked every field. The opt-out flag
+           * suspends that until she edits the roll number herself, so this is a
+           * real escape rather than a half-second flicker. */}
+          <button
+            type="button"
+            onClick={() => {
+              manualOptOutRef.current = true
+              jeeVerifiedRef.current = false
+              // Kill the lookup the blur just kicked off, so it cannot resolve
+              // and re-lock after this handler has finished.
+              abortRef.current?.abort()
+              clearTimeout(debounceRef.current)
+              setLocked(false)
+              setLookupState('idle')
+            }}
+            className="font-extrabold text-ink underline underline-offset-2 hover:text-ink-soft"
+          >
+            {t('lookup.clear')}
+          </button>
+          {/* Explanatory, not part of the control: sits on the same line, in the
+           * banner's own muted tone so it reads as a note about the link rather
+           * than competing with it. */}
+          <span className="text-ink-soft/60">{t('lookup.clearHint')}</span>
         </p>
 
         <TextField
@@ -463,7 +524,7 @@ onChange={(e) => {
           placeholder={t('fields.fullNamePh')}
           value={details.fullName}
           error={show('fullName')}
-          locked={locked}
+          locked={lockIfFilled(locked, details.fullName)}
           onChange={(e) => set('fullName', e.target.value)}
           autoComplete="name"
           maxLength={100}
@@ -477,7 +538,7 @@ onChange={(e) => {
           placeholder={t('fields.branchPh')}
           value={details.branch}
           error={show('branch')}
-          locked={locked}
+          locked={lockIfFilled(locked, details.branch)}
           onChange={(e) => set('branch', e.target.value)}
         />
 
@@ -489,9 +550,19 @@ onChange={(e) => {
           placeholder={t('fields.sectionPh')}
           value={resolvedDetails.section}
           error={show('section')}
-          locked={locked}
+          /* Prefers the "we have no section for you" prompt over the
+           * single-section note: a branch that runs one section auto-fills a
+           * non-empty value, so the two can never both be the reason the field
+           * is inert. */
+          hint={
+            locked && !resolvedDetails.section
+              ? t('fields.sectionMissing')
+              : singleSection
+                ? t('fields.sectionFixed')
+                : undefined
+          }
+          locked={lockIfFilled(locked, resolvedDetails.section)}
           disabled={singleSection && !locked}
-          hint={singleSection ? t('fields.sectionFixed') : undefined}
           onChange={(e) => set('section', e.target.value)}
         />
 
@@ -522,7 +593,7 @@ onChange={(e) => {
           value={details.yearOfStudy}
           error={show('yearOfStudy')}
           hint={locked && !details.yearOfStudy ? t('fields.yearMissing') : undefined}
-          locked={locked && Boolean(details.yearOfStudy.trim())}
+          locked={lockIfFilled(locked, details.yearOfStudy)}
           onChange={(e) => set('yearOfStudy', e.target.value)}
         />
 
@@ -568,8 +639,8 @@ onChange={(e) => {
                 const digits = digitsOnly(e.target.value).slice(0, 10)
                 set('contactNumber', digits)
               }}
-              disabled={locked}
-              readOnly={locked}
+              disabled={lockIfFilled(locked, details.contactNumber)}
+              readOnly={lockIfFilled(locked, details.contactNumber)}
               inputMode="numeric"
               autoComplete="tel-national"
               maxLength={10}
@@ -601,7 +672,7 @@ onChange={(e) => {
           placeholder={t('fields.genderPh')}
           value={details.gender}
           error={show('gender')}
-          locked={locked}
+          locked={lockIfFilled(locked, details.gender)}
           onChange={(e) => set('gender', e.target.value)}
         />
 
@@ -686,7 +757,7 @@ onChange={(e) => {
           placeholder={t('fields.skillsPh')}
           value={details.skills}
           error={show('skills')}
-          locked={locked}
+          locked={lockIfFilled(locked, details.skills)}
           onChange={(e) => set('skills', e.target.value)}
         />
 
