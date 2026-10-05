@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLanguage } from '../i18n'
 import { markFormComplete } from '../api/client'
 import { verticalByKey } from '../config/verticals'
+import { WhatsAppInvite } from './WhatsAppInvite'
 import type { ExistingRegistration } from '../types'
 
 /**
@@ -127,6 +128,21 @@ export function ResponseNoted({
                 </div>
               )
             })}
+          </div>
+
+          {/*
+            Upside-down triangle: the two form pebbles sit side by side above and
+            this one is centred beneath them. Capped at the same 14rem as a form
+            pebble so the base of the triangle matches its top edge instead of
+            reading as a separate, wider control.
+
+            A returning student is exactly who needs this - they have already
+            responded, so the group is the only thing left useful for them.
+          */}
+          <div className="mt-2 flex justify-center">
+            <div className="w-full sm:max-w-[14rem]">
+              <WhatsAppInvite full />
+            </div>
           </div>
         </div>
 

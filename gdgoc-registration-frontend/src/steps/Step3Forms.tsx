@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLanguage } from '../i18n'
 import { markFormComplete } from '../api/client'
+import { WhatsAppInvite } from '../components/WhatsAppInvite'
 import { VERTICALS } from '../config/verticals'
 import type { AuthorisedForms, StudentDetails } from '../types'
 
@@ -335,9 +336,14 @@ function DonePanel({ details, single }: { details: StudentDetails; single: boole
         <p className="mt-2 text-[0.7rem] leading-relaxed text-ink-soft/60">
           {single ? t('step3.allDoneSingleHint') : t('step3.allDoneHint')}
         </p>
-        <p className="mt-4 text-[0.7rem] text-ink-soft/50">
-          {details.fullName} · {details.rollNumber}
+<p className="mt-4 text-[0.7rem] text-ink-soft/50">
+          {details.fullName} � {details.rollNumber}
         </p>
+        {/* No form pebbles on this screen, so the invite sizes to its own label rather
+            than stretching to match a pair it is not beside. */}
+        <div className="mt-7 flex justify-center">
+          <WhatsAppInvite />
+        </div>
       </div>
     </div>
   )

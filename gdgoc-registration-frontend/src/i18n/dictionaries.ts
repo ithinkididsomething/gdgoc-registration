@@ -123,6 +123,9 @@ export const en = {
     'That is everything — you chose a single team, so there is no second form. You can close this tab.',
   'step3.securityNote':
     'These forms were issued specifically for your registration. Please do not share them.',
+  'step3.whatsappInvite':
+    'Join the GDGoC Recruitment 2026 Phase-1 WhatsApp group using below link:',
+  'step3.whatsappCta': 'Join the WhatsApp Group',
 
   // Shown instead of the flow when the roll number has already registered.
   'noted.title': 'Your response has been noted',
@@ -266,6 +269,9 @@ const hi: Record<TranslationKey, string> = {
   'step3.allDoneSingleHint':
     'बस इतना ही है — आपने एक ही टीम चुनी है, इसलिए कोई दूसरा फ़ॉर्म नहीं है। आप यह टैब बंद कर सकते हैं।',
   'step3.securityNote': 'ये फ़ॉर्म आपके पंजीकरण के लिए विशेष रूप से जारी किए गए हैं। कृपया इन्हें साझा न करें।',
+  'step3.whatsappInvite':
+    'नीचे दिए लिंक से GDGoC रिक्रूटमेंट 2026 फेज़-1 व्हाट्सएप ग्रुप में शामिल हों:',
+  'step3.whatsappCta': 'व्हाट्सएप ग्रुप जॉइन करें',
 
   'noted.title': 'आपकी प्रतिक्रिया दर्ज हो गई है',
   'noted.subtitle':
