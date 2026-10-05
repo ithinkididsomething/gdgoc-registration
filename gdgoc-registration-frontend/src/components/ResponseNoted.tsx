@@ -4,6 +4,7 @@ import { markFormComplete } from '../api/client'
 import { verticalByKey } from '../config/verticals'
 import { WhatsAppInvite } from './WhatsAppInvite'
 import type { ExistingRegistration } from '../types'
+import { NO_SECOND_PRIORITY } from '../types'
 
 /**
  * Shown instead of the whole flow once a roll number is recognised as already
@@ -49,7 +50,24 @@ export function ResponseNoted({
 
   const priority1 = verticalByKey(registration.priority1)
   const priority2 = verticalByKey(registration.priority2)
-  const everythingDone = marked[1] && marked[2]
+
+  /**
+   * Does this student have a second form at all?
+   *
+   * Someone who picked "None" has no priority2CompletedAt and never will, so
+   * `marked[1] && marked[2]` left them permanently "not done" and rendered a
+   * permanently greyed-out "None" pebble with a "mark submitted" button they
+   * could never satisfy. Both signals are checked: the server omits
+   * `forms.priority2` for them, and the stored priority2 is the sentinel.
+   */
+  const hasSecondForm =
+    Boolean(registration.forms.priority2) && registration.priority2 !== NO_SECOND_PRIORITY
+
+  const everythingDone = marked[1] && (hasSecondForm ? marked[2] : true)
+
+  // Only render stages that exist. Showing an unopenable second pebble would
+  // imply a form exists that the organisers never issued.
+  const stages: (1 | 2)[] = hasSecondForm ? [1, 2] : [1]
 
   return (
     <div className="step3-rise text-center">
@@ -97,7 +115,7 @@ export function ResponseNoted({
           </p>
 
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-            {([1, 2] as const).map((stage) => {
+            {stages.map((stage) => {
               const form = stage === 1 ? registration.forms.priority1 : registration.forms.priority2
               const vertical = stage === 1 ? priority1 : priority2
               return (
