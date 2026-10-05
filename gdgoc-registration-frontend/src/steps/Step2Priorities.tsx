@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Spinner } from '../components/Spinner'
+import { GuidelineNotice } from '../components/GuidelineNotice'
 import { useLanguage } from '../i18n'
 import { VERTICALS } from '../config/verticals'
 import type { StudentDetails, VerticalKey } from '../types'
@@ -79,6 +80,8 @@ export function Step2Priorities({ details, submitting, onBack, onConfirm }: Step
         </h2>
         <p className="mx-auto mt-2 max-w-md text-xs text-ink-soft/70">{t('step2.sub')}</p>
       </div>
+
+      <GuidelineNotice />
 
       {/* Applicant summary */}
       <div className="neu-inset mb-6 px-5 py-4">
