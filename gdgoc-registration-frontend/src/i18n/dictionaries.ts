@@ -81,7 +81,7 @@ export const en = {
   'lookup.clear': 'Edit manually',
   'lookup.clearHint': '(if any information is wrong)',
 
-  'action.submit': 'SUBMIT GDG FRESHER\'S RECRUITMENT REGISTRATION FORM',
+  'action.submit': 'Click to proceed to Next Section',
   'action.confirm': 'CONFIRM SELECTION & PROCEED TO ASSIGNMENTS',
   'action.submitting': 'Submitting…',
   'action.back': 'Back to details',
@@ -252,7 +252,7 @@ const hi: Record<TranslationKey, string> = {
   'lookup.clear': 'स्वयं संपादित करें',
   'lookup.clearHint': '(यदि कोई जानकारी ग़लत है)',
 
-  'action.submit': 'जीडीजी फ्रेशर रिक्रूटमेंट पंजीकरण फ़ॉर्म जमा करें',
+  'action.submit': 'अगले भाग पर जाने के लिए क्लिक करें',
   'action.confirm': 'चयन की पुष्टि करें और असाइनमेंट पर जाएं',
   'action.submitting': 'जमा किया जा रहा है…',
   'action.back': 'विवरण पर वापस जाएं',
