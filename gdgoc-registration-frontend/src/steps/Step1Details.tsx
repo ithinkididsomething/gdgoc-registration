@@ -279,18 +279,26 @@ export function Step1Details({
         // single click appeared to do nothing and a second one worked.
         if (controller.signal.aborted || manualOptOutRef.current) return
 
-        if (result.found) {
-          // Already responded. Stop here rather than pre-filling a form the
-          // student is not allowed to submit: the parent swaps in the "response
-          // noted" screen, and anything filled in below would be thrown away by
-          // the 409 anyway. A JEE number is a valid lookup key but not a valid
-          // thing to register against, so a returning student is only recognised
-          // by the roll number they are meant to register with.
-          if (result.registered && result.registration && !JEE_ROLL_RE.test(rollNumber)) {
-            alreadyRegisteredRef.current(rollNumber, result.registration)
-            return
-          }
+        // Already responded. Checked BEFORE the roster branch, and deliberately
+        // independent of `found`: the server reports `registered` even when the
+        // roll number is absent from the roster, because a student who
+        // registered but is missing from it is a real case. This check used to
+        // live inside `if (result.found)`, so every such student was dropped
+        // into an empty form and made to retype everything, even though the
+        // server had just told us they were done.
+        //
+        // Stop here rather than pre-filling a form the student is not allowed
+        // to submit: the parent swaps in the "response noted" screen, and
+        // anything typed below would be thrown away by the 409 anyway. A JEE
+        // number is a valid lookup key but not a valid thing to register
+        // against, so a returning student is only recognised by the roll number
+        // they are meant to register with.
+        if (result.registered && result.registration && !JEE_ROLL_RE.test(rollNumber)) {
+          alreadyRegisteredRef.current(rollNumber, result.registration)
+          return
+        }
 
+        if (result.found) {
           // A JEE number is a valid lookup key but not a valid thing to
           // register against. Keep the verified details, drop the number, and
           // ask for the college roll number instead.
