@@ -123,7 +123,9 @@ export const en = {
   'step2.summary': 'APPLICANT SUMMARY',
   'step2.noSelection': 'Not selected',
 
-  'step3.notice': 'Registration logged for GDG IET DAVV Induction 2026-27! Complete your task forms below.',
+  'step3.noticeBefore': 'Registration logged for ',
+  'step3.noticeHighlight': 'GDG IET DAVV RECRUITMENTS 2026-27',
+  'step3.noticeAfter': '! Complete your task forms below.',
   'step3.progress': 'Form progress',
   'step3.priority1Cta': 'Priority 1 Form',
   'step3.priority2Cta': 'Priority 2 Form',
@@ -294,7 +296,9 @@ const hi: Record<TranslationKey, string> = {
   'step2.summary': 'आवेदक सारांश',
   'step2.noSelection': 'चयनित नहीं',
 
-  'step3.notice': 'GDG IET DAVV इंडक्शन 2026-27 के लिए पंजीकरण दर्ज हो गया! नीचे अपने टास्क फ़ॉर्म पूरे करें।',
+  'step3.noticeBefore': '',
+  'step3.noticeHighlight': 'GDG IET DAVV RECRUITMENTS 2026-27',
+  'step3.noticeAfter': ' के लिए पंजीकरण दर्ज हो गया! नीचे अपने टास्क फ़ॉर्म पूरे करें।',
   'step3.progress': 'फ़ॉर्म प्रगति',
   'step3.priority1Cta': 'प्राथमिकता 1 फ़ॉर्म',
   'step3.priority2Cta': 'प्राथमिकता 2 फ़ॉर्म',

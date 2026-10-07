@@ -401,7 +401,11 @@ export function Step3Forms({ details, forms }: Step3Props) {
             />
           </svg>
         </span>
-        <p className="text-sm leading-relaxed font-extrabold text-ink">{t('step3.notice')}</p>
+        <p className="text-sm leading-relaxed font-extrabold text-ink">
+          {t('step3.noticeBefore')}
+          <span className="font-extrabold text-info-blue">{t('step3.noticeHighlight')}</span>
+          {t('step3.noticeAfter')}
+        </p>
         <p className="mt-2 text-[0.7rem] text-ink-soft/65">
           {details.fullName} · {details.rollNumber}
         </p>

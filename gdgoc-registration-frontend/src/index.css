@@ -41,6 +41,14 @@
   --color-accent-red: #c03440;
   --color-accent-green: #177650;
 
+  /* Inline emphasis on the success notice. Kept out of the `accent` family,
+     which is the yellow brand mark and never a text colour. Values are picked
+     for contrast rather than taste: #0b57d0 is 5.7:1 on the #eef2f7 surface
+     and #8ab4f8 is 6.7:1 on the #232c3b surface, so both clear AA for the
+     0.875rem extrabold text they're used on. Declaring it here means the
+     utility resolves through var() and inverts with `.dark` for free. */
+  --color-info-blue: #0b57d0;
+
   --font-display: 'Outfit', 'Segoe UI', system-ui, sans-serif;
 }
 
@@ -77,6 +85,7 @@
   --color-accent: #ffc845;
   --color-accent-red: #ff7b86;
   --color-accent-green: #3fce92;
+  --color-info-blue: #8ab4f8;
 
   /* Only the badge's SHADOW adapts. The fill stays brand navy so the pill
      keeps its identity instead of turning into a bright blue sticker. */
