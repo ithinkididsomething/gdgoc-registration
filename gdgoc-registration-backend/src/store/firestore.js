@@ -209,12 +209,38 @@ function getFirestore() {
  */
 
 /**
+ * Did the write lose because the row was already there?
+ *
+ * gRPC reports this as status 6 / ALREADY_EXISTS, and the SDK copies
+ * `status.code` straight onto the thrown error (`error.code = status.code`),
+ * so the numeric form is the one that actually arrives. The string form is
+ * kept as belt and braces - it costs nothing and covers the SDK mapping it
+ * later.
+ */
+function isAlreadyExists(error) {
+  return error?.code === 6 || error?.code === "ALREADY_EXISTS";
+}
+
+/**
  * Append one registration record.
  *
- * The duplicate check and the insert share a transaction, so the pair is atomic
- * across every process. `tx.create` (rather than `set`) is deliberate belt and
- * braces: if a document appeared between the read and the write, `create` fails
- * instead of silently overwriting a student's real registration.
+ * DELIBERATELY PERFORMS NO READ.
+ *
+ * The previous shape read the row inside a transaction and wrote only if it was
+ * absent. That read is avoidable: `create` sends an `exists=false` precondition,
+ * Firestore evaluates it server-side as part of the same write, and a conflict
+ * comes back as ALREADY_EXISTS. The check and the insert remain atomic - a
+ * transaction is one way to get atomicity, not the only one.
+ *
+ * WHY IT IS WORTH REMOVING: reads and writes have separate quotas. Once the read
+ * quota is gone, the read-first version could never reach its own write, so
+ * students were refused at the point of registering for a limit they had not
+ * used. Here the write path stays reachable regardless of the read quota, and
+ * the transaction retry loop that used to hang until Vercel's 30s timeout goes
+ * away with it.
+ *
+ * `create` rather than `set` is what makes the duplicate check work at all: a
+ * `set` would silently overwrite a student's real registration.
  */
 async function appendRegistration(record) {
   const db = getFirestore();
@@ -222,15 +248,12 @@ async function appendRegistration(record) {
   const ref = db.collection(COLLECTION).doc(rollKey(stored.rollNumber));
 
   try {
-    await db.runTransaction(async (transaction) => {
-      const existing = await transaction.get(ref);
-      if (existing.exists) throw alreadyRegisteredError();
-      transaction.create(ref, stored);
-    });
+    await ref.create(stored);
   } catch (error) {
     // A duplicate is a normal outcome, not a fault - pass it through untouched so
     // the route can answer 409. Everything else is our problem.
     if (error.code === "alreadyRegistered") throw error;
+    if (isAlreadyExists(error)) throw alreadyRegisteredError();
     throw persistError(error);
   }
 

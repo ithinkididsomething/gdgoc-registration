@@ -95,7 +95,14 @@ function persistError(error, message = "Could not persist the registration.") {
  *   Store one validated registration, resolving with the stored record.
  *   MUST reject with `alreadyRegisteredError()` if the roll number is taken, and
  *   MUST do the check and the insert atomically — within one process for a file
- *   driver, within one transaction for a database driver.
+ *   driver, in one indivisible operation for a database driver.
+ *
+ *   That does not have to be a transaction. An exists=false precondition is
+ *   evaluated server-side as part of the write itself, so it satisfies this
+ *   while costing no reads at all. Prefer it: reads and writes are metered
+ *   against separate quotas, and a driver that must read before it may write
+ *   stops accepting registrations the moment the read quota is spent — which
+ *   is not a limit the student used.
  *
  *   Deliberately no record count in the return value. The file driver could
  *   report the array length for free; a database driver would need a second
