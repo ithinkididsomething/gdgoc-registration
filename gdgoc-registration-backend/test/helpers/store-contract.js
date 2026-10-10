@@ -16,8 +16,8 @@ const assert = require("node:assert/strict");
  * driver, because that is what `REGISTRATION_STORE` resolves to by default. When
  * a second engine exists, "the tests pass" stops meaning "the app works" and
  * starts meaning "the app works with the engine it happened to be pointed at".
- * A Firestore driver missing `orderBy("submittedAt")` passes every single one of
- * those tests and silently sorts the organisers' spreadsheet by roll number.
+ * A Firestore driver that forgets to order by `submittedAt` passes every single
+ * one of those tests and silently sorts the organisers' spreadsheet by roll number.
  *
  * So: every driver runs THIS file. A new engine is proven interchangeable or it
  * is not proven at all.
@@ -317,8 +317,8 @@ function runStoreContract({ test, label, makeDriver, supportsReset = true, skip 
   });
 
   it("returns records OLDEST FIRST, because the CSV is read in submission order", async () => {
-    // This is the assertion that catches a Firestore driver missing its
-    // `orderBy("submittedAt")`. Firestore's default order is by document ID,
+    // This is the assertion that catches a Firestore driver that forgets to
+    // order by `submittedAt`. Firestore's default order is by document ID,
     // which is alphabetical by roll number - so the organisers' sheet would be
     // sorted by roll number instead of by when people actually responded, and
     // nothing else in the suite would notice.

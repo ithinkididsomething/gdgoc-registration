@@ -153,3 +153,35 @@ it("firestore store: one document per student, keyed by normalised roll number",
 
   await driver.reset();
 });
+
+// --- Pure logic: no Firestore needed ----------------------------------------
+// The ordering rule is a plain comparator, so it is asserted directly rather
+// than only through the emulator - which cannot run everywhere. `orderBy` used to
+// do this and silently dropped untimestamped rows; the whole point of the sort is
+// that it cannot.
+
+test("firestore store: records without a timestamp sort LAST, never dropped", () => {
+  const { compareBySubmittedAt } = require("../src/store/firestore")._internals;
+
+  const sorted = [
+    { id: "c", submittedAt: "2026-01-02T00:00:00.000Z" },
+    { id: "a", submittedAt: "2026-01-01T00:00:00.000Z" },
+    { id: "e", submittedAt: "2026-01-03T00:00:00.000Z" },
+    { id: "b" }, // field absent entirely
+    { id: "d", submittedAt: "" }, // present but empty
+  ].sort(compareBySubmittedAt);
+
+  assert.deepEqual(
+    sorted.map((r) => r.id),
+    ["a", "c", "e", "b", "d"],
+    "expected oldest first, with untimestamped records kept and placed last"
+  );
+
+  // Equal timestamps keep their incoming order (sort is stable), so a batch that
+  // shares one millisecond does not shuffle between exports.
+  const tied = [
+    { id: "first", submittedAt: "2026-01-01T00:00:00.000Z" },
+    { id: "second", submittedAt: "2026-01-01T00:00:00.000Z" },
+  ].sort(compareBySubmittedAt);
+  assert.deepEqual(tied.map((r) => r.id), ["first", "second"]);
+});

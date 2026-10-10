@@ -324,25 +324,45 @@ async function markFormCompleted(rollNumber, stage) {
 }
 
 /**
+ * Oldest first, by `submittedAt`.
+ *
+ * ISO-8601 strings compare correctly as plain text, which is the same property the
+ * file driver leans on. A record with no usable timestamp sorts LAST rather than
+ * being hidden: an incomplete row an organiser can see and correct beats a
+ * registration that never reaches the sheet at all.
+ */
+function compareBySubmittedAt(left, right) {
+  const a = typeof left.submittedAt === "string" ? left.submittedAt : "";
+  const b = typeof right.submittedAt === "string" ? right.submittedAt : "";
+  if (a === b) return 0;
+  if (a === "") return 1;
+  if (b === "") return -1;
+  return a < b ? -1 : 1;
+}
+
+/**
  * Every record, oldest first.
  *
  * THE ORDERING IS NOT OPTIONAL. Firestore returns documents in document-ID order
- * by default, which is alphabetical by rollKey - so without this the organisers'
- * CSV would be sorted by roll number instead of by submission, and nobody would
+ * by default, which is alphabetical by rollKey - so without a sort the organisers'
+ * CSV would be ordered by roll number instead of by submission, and nobody would
  * notice until someone compared it to the order responses actually came in.
  *
- * Related trap in the same place: `orderBy` SILENTLY EXCLUDES documents that do
- * not have the field. Every document written here has `submittedAt`, so this is
- * safe - but a document added by hand in the Firebase console would simply not
- * appear in the export, with no error. Do not make `submittedAt` optional.
+ * The sort happens HERE, in the process, and NOT with `orderBy("submittedAt")` in
+ * the query. `orderBy` is the obvious way to get this order and also the way to
+ * lose rows silently: Firestore OMITS every document that lacks the ordered field,
+ * with no error. A record written without `submittedAt` - added by hand in the
+ * console, or restored from an import that dropped the column - therefore never
+ * appears in the export. A row can only be missing from the sheet if it was never
+ * returned, and a sort cannot drop anything.
  */
 async function readAllRegistrations() {
   try {
-    const snapshot = await getFirestore()
-      .collection(COLLECTION)
-      .orderBy("submittedAt", "asc")
-      .get();
-    return snapshot.docs.map((document) => toPlainRecord(document.id, document.data()));
+    const snapshot = await getFirestore().collection(COLLECTION).get();
+    const records = snapshot.docs.map((document) =>
+      toPlainRecord(document.id, document.data())
+    );
+    return records.sort(compareBySubmittedAt);
   } catch (error) {
     throw persistError(error, "Could not read the registration log.");
   }
@@ -405,8 +425,9 @@ const firestoreStore = {
   markFormCompleted,
   drain,
   reset,
-  // Exposed so tests can point the driver at the emulator before first use.
-  _internals: { getFirestore, COLLECTION },
+  // Exposed so tests can point the driver at the emulator before first use, and
+  // so the ordering rule - pure logic, no database - can be asserted without one.
+  _internals: { getFirestore, COLLECTION, compareBySubmittedAt },
 };
 
 module.exports = firestoreStore;
